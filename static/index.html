@@ -1,0 +1,1530 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ThreatIQ — Threat Intelligence Platform</title>
+
+  <!--
+    WHAT IS THIS FILE?
+    This is a Single-Page Application (SPA) — one HTML file that renders
+    multiple "pages" by showing/hiding sections via JavaScript.
+
+    STRUCTURE:
+    1. <head>  — fonts, styles (CSS)
+    2. <body>  — sidebar + main content area (HTML)
+    3. <script>— all interactivity (JavaScript at the bottom)
+
+    WHY EVERYTHING IN ONE FILE?
+    For a hackathon demo, a single file is fast to iterate on and easy
+    to share. No build step, no bundler, no npm install for the frontend.
+
+    FONTS: IBM Plex Mono (code/headings) + IBM Plex Sans (body)
+    CHARTS: Chart.js loaded from CDN (cdnjs.cloudflare.com)
+  -->
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@300;400;600&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+
+  <style>
+    /* ============================================================
+       CSS CUSTOM PROPERTIES (Variables)
+       Defining colors here means we can change the whole theme
+       by editing just this section.
+    ============================================================ */
+    :root {
+      --bg-base:       #05080f;   /* darkest background */
+      --bg-surface:    #0a1020;   /* sidebar, cards */
+      --bg-card:       #0d1829;   /* content cards */
+      --bg-input:      #0f1e33;   /* form inputs */
+      --accent:        #00b4d8;   /* primary cyan */
+      --accent-dim:    #0077a3;   /* dimmed cyan */
+      --success:       #06d6a0;   /* green for clean/low */
+      --warning:       #f4a261;   /* amber for suspicious/medium */
+      --danger:        #ef233c;   /* red for malicious/critical */
+      --purple:        #9d4edd;   /* purple for APT */
+      --text-1:        #d0e8ff;   /* primary text */
+      --text-2:        #7090ae;   /* secondary text */
+      --text-3:        #3a5570;   /* muted text */
+      --border:        #1a2f48;   /* card borders */
+      --border-hover:  #2a4a68;   /* hover state borders */
+      --font-mono:     'IBM Plex Mono', monospace;
+      --font-sans:     'IBM Plex Sans', sans-serif;
+    }
+
+    /* ── Reset & Base ─────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      height: 100%;
+      background: var(--bg-base);
+      color: var(--text-1);
+      font-family: var(--font-sans);
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    /* Scrollbar styling — thin, dark, cyber look */
+    ::-webkit-scrollbar { width: 4px; height: 4px; }
+    ::-webkit-scrollbar-track { background: var(--bg-base); }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+    /* ── Layout ────────────────────────────────────────────────── */
+    /* CSS Grid: sidebar fixed at 220px, main area takes remaining space */
+    .layout {
+      display: grid;
+      grid-template-columns: 220px 1fr;
+      grid-template-rows: 100vh;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    /* ── Sidebar ───────────────────────────────────────────────── */
+    .sidebar {
+      background: var(--bg-surface);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      padding: 20px 0;
+      overflow-y: auto;
+    }
+
+    .sidebar-logo {
+      padding: 0 20px 20px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .sidebar-logo .name {
+      font-family: var(--font-mono);
+      font-size: 1.2rem;
+      font-weight: 600;
+      color: var(--accent);
+      letter-spacing: -0.5px;
+    }
+
+    .sidebar-logo .tagline {
+      font-size: 0.72rem;
+      color: var(--text-2);
+      margin-top: 2px;
+    }
+
+    .nav-section {
+      padding: 16px 12px 0;
+    }
+
+    .nav-label {
+      font-size: 0.65rem;
+      color: var(--text-3);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      padding: 0 8px 6px;
+      font-family: var(--font-mono);
+    }
+
+    /* Navigation button */
+    .nav-btn {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      width: 100%;
+      padding: 9px 10px;
+      border: none;
+      border-radius: 6px;
+      background: transparent;
+      color: var(--text-2);
+      font-family: var(--font-sans);
+      font-size: 0.85rem;
+      cursor: pointer;
+      text-align: left;
+      transition: all 0.15s;
+      margin-bottom: 2px;
+    }
+
+    .nav-btn:hover { background: var(--bg-card); color: var(--text-1); }
+
+    /* Active nav button — highlighted with accent border */
+    .nav-btn.active {
+      background: rgba(0, 180, 216, 0.12);
+      color: var(--accent);
+      border-left: 2px solid var(--accent);
+      padding-left: 8px;
+    }
+
+    .nav-icon { font-size: 14px; width: 16px; text-align: center; }
+
+    /* API status indicators at the bottom of sidebar */
+    .api-status {
+      margin-top: auto;
+      padding: 16px 20px;
+      border-top: 1px solid var(--border);
+      font-size: 0.75rem;
+    }
+
+    .api-status-title {
+      color: var(--text-3);
+      font-family: var(--font-mono);
+      font-size: 0.65rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-bottom: 8px;
+    }
+
+    .api-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 3px 0;
+    }
+
+    .api-row span { color: var(--text-2); }
+
+    /* Status dot — green if configured, red if not */
+    .dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: var(--danger);
+    }
+    .dot.ok { background: var(--success); }
+
+    /* ── Main Content Area ─────────────────────────────────────── */
+    .main {
+      overflow-y: auto;
+      padding: 24px;
+      background: var(--bg-base);
+    }
+
+    /* ── Page Sections (show/hide via JS) ─────────────────────── */
+    /* Each .page-section is a "page" — only one is visible at a time */
+    .page-section { display: none; }
+    .page-section.active { display: block; }
+
+    /* ── Page Header ───────────────────────────────────────────── */
+    .page-header {
+      margin-bottom: 24px;
+    }
+
+    .page-title {
+      font-family: var(--font-mono);
+      font-size: 1.3rem;
+      font-weight: 600;
+      color: var(--text-1);
+    }
+
+    .page-subtitle {
+      color: var(--text-2);
+      font-size: 0.82rem;
+      margin-top: 4px;
+    }
+
+    /* Live indicator (blinking dot) */
+    .live-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      background: rgba(6, 214, 160, 0.1);
+      border: 1px solid rgba(6, 214, 160, 0.3);
+      border-radius: 20px;
+      padding: 2px 8px;
+      font-size: 0.7rem;
+      color: var(--success);
+      font-family: var(--font-mono);
+    }
+
+    .live-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--success);
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+
+    /* ── Stats Cards Row ───────────────────────────────────────── */
+    /* CSS Grid auto-fits cards — 4 per row on wide screens */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 14px;
+      margin-bottom: 24px;
+    }
+
+    .stat-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px 18px;
+      transition: border-color 0.2s;
+    }
+
+    .stat-card:hover { border-color: var(--border-hover); }
+
+    .stat-card .label {
+      font-size: 0.72rem;
+      color: var(--text-2);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-family: var(--font-mono);
+    }
+
+    .stat-card .value {
+      font-family: var(--font-mono);
+      font-size: 1.8rem;
+      font-weight: 600;
+      color: var(--accent);
+      margin: 6px 0 2px;
+      line-height: 1;
+    }
+
+    .stat-card .sublabel {
+      font-size: 0.72rem;
+      color: var(--text-3);
+    }
+
+    /* ── Charts Grid ───────────────────────────────────────────── */
+    .charts-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      margin-bottom: 24px;
+    }
+
+    .chart-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 18px;
+    }
+
+    .chart-title {
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      color: var(--text-2);
+      margin-bottom: 14px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    .chart-wrap {
+      position: relative;
+      height: 200px;
+    }
+
+    /* ── Article Cards ─────────────────────────────────────────── */
+    .articles-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .article-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px;
+      transition: border-color 0.2s, transform 0.15s;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .article-card:hover {
+      border-color: var(--border-hover);
+      transform: translateY(-1px);
+    }
+
+    .article-meta {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .badge {
+      font-size: 0.65rem;
+      font-family: var(--font-mono);
+      padding: 2px 7px;
+      border-radius: 3px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    /* Category badge colors */
+    .badge-malware      { background: rgba(239,35,60,0.15);  color: #ff6b6b; }
+    .badge-phishing     { background: rgba(244,162,97,0.15); color: #f4a261; }
+    .badge-vulnerability{ background: rgba(157,78,221,0.15); color: #c77dff; }
+    .badge-data-breach  { background: rgba(0,180,216,0.15);  color: #00b4d8; }
+    .badge-apt          { background: rgba(239,35,60,0.2);   color: #ff4d6d; }
+    .badge-general      { background: rgba(112,144,174,0.15);color: #7090ae; }
+    .badge-source       { background: rgba(0,180,216,0.1);   color: var(--accent-dim); }
+
+    .article-title {
+      font-size: 0.88rem;
+      font-weight: 600;
+      color: var(--text-1);
+      line-height: 1.4;
+    }
+
+    .article-title a {
+      color: inherit;
+      text-decoration: none;
+      transition: color 0.15s;
+    }
+
+    .article-title a:hover { color: var(--accent); }
+
+    .article-summary {
+      font-size: 0.78rem;
+      color: var(--text-2);
+      line-height: 1.5;
+      display: -webkit-box;
+      -webkit-line-clamp: 3;         /* Show max 3 lines, then "..." */
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    .article-date {
+      font-size: 0.7rem;
+      color: var(--text-3);
+      font-family: var(--font-mono);
+      margin-top: auto;
+    }
+
+    /* ── Category Filter Buttons ───────────────────────────────── */
+    .filter-bar {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 20px;
+    }
+
+    .filter-btn {
+      padding: 5px 12px;
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      background: transparent;
+      color: var(--text-2);
+      font-size: 0.78rem;
+      cursor: pointer;
+      transition: all 0.15s;
+      font-family: var(--font-sans);
+    }
+
+    .filter-btn:hover { border-color: var(--accent-dim); color: var(--text-1); }
+    .filter-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+    /* ── IOC Lookup ────────────────────────────────────────────── */
+    .ioc-tabs {
+      display: flex;
+      gap: 0;
+      margin-bottom: 20px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .ioc-tab {
+      padding: 8px 20px;
+      border: none;
+      background: transparent;
+      color: var(--text-2);
+      font-size: 0.85rem;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      transition: all 0.15s;
+      font-family: var(--font-sans);
+    }
+
+    .ioc-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+    .ioc-tab:hover { color: var(--text-1); }
+
+    .ioc-panel { display: none; }
+    .ioc-panel.active { display: block; }
+
+    /* Input + Button row */
+    .input-row {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+
+    .ioc-input {
+      flex: 1;
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text-1);
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      padding: 10px 14px;
+      transition: border-color 0.15s;
+      outline: none;
+    }
+
+    .ioc-input::placeholder { color: var(--text-3); }
+    .ioc-input:focus { border-color: var(--accent-dim); }
+
+    .lookup-btn {
+      padding: 10px 20px;
+      background: var(--accent-dim);
+      border: 1px solid var(--accent);
+      border-radius: 8px;
+      color: #fff;
+      font-size: 0.85rem;
+      font-family: var(--font-mono);
+      cursor: pointer;
+      transition: background 0.15s;
+      white-space: nowrap;
+    }
+
+    .lookup-btn:hover { background: var(--accent); }
+    .lookup-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* IOC Result Card */
+    .ioc-result {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 20px;
+    }
+
+    .verdict-banner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .verdict-badge {
+      font-family: var(--font-mono);
+      font-size: 1rem;
+      font-weight: 600;
+      padding: 6px 16px;
+      border-radius: 6px;
+    }
+
+    .verdict-MALICIOUS  { background: rgba(239,35,60,0.2);  color: #ff4d6d; border: 1px solid #ef233c; }
+    .verdict-SUSPICIOUS { background: rgba(244,162,97,0.2); color: #f4a261; border: 1px solid #f4a261; }
+    .verdict-CLEAN      { background: rgba(6,214,160,0.2);  color: #06d6a0; border: 1px solid #06d6a0; }
+    .verdict-NOT\ FOUND { background: rgba(112,144,174,0.15); color: #7090ae; border: 1px solid #3a5570; }
+
+    .ioc-fields {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .ioc-field {
+      background: var(--bg-input);
+      border-radius: 6px;
+      padding: 10px 12px;
+    }
+
+    .ioc-field .fk {
+      font-size: 0.68rem;
+      color: var(--text-3);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-family: var(--font-mono);
+    }
+
+    .ioc-field .fv {
+      font-size: 0.88rem;
+      color: var(--text-1);
+      font-family: var(--font-mono);
+      margin-top: 2px;
+    }
+
+    /* Engine gauge for VirusTotal detections */
+    .detection-bar {
+      height: 8px;
+      background: var(--bg-input);
+      border-radius: 4px;
+      overflow: hidden;
+      margin-top: 4px;
+    }
+
+    .detection-fill {
+      height: 100%;
+      border-radius: 4px;
+      background: var(--danger);
+      transition: width 0.5s ease;
+    }
+
+    /* ── AI Briefing ───────────────────────────────────────────── */
+    .generate-btn {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 24px;
+      background: linear-gradient(135deg, var(--accent-dim), #0055a0);
+      border: 1px solid var(--accent);
+      border-radius: 8px;
+      color: #fff;
+      font-size: 0.88rem;
+      font-family: var(--font-mono);
+      cursor: pointer;
+      transition: opacity 0.2s;
+      margin-bottom: 20px;
+    }
+
+    .generate-btn:hover { opacity: 0.85; }
+    .generate-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .briefing-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 24px;
+    }
+
+    .briefing-text {
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      color: var(--text-1);
+      line-height: 1.8;
+      white-space: pre-wrap;   /* Preserve newlines from the API response */
+    }
+
+    /* Color-coded briefing sections */
+    .briefing-text .section-head {
+      color: var(--accent);
+      font-weight: 600;
+    }
+
+    .briefing-meta {
+      font-size: 0.72rem;
+      color: var(--text-3);
+      font-family: var(--font-mono);
+      margin-top: 16px;
+      padding-top: 12px;
+      border-top: 1px solid var(--border);
+    }
+
+    /* ── OTX Pulses ────────────────────────────────────────────── */
+    .pulses-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .pulse-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px;
+      transition: border-color 0.2s;
+    }
+
+    .pulse-card:hover { border-color: var(--border-hover); }
+
+    .pulse-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    .pulse-name {
+      font-size: 0.88rem;
+      font-weight: 600;
+      color: var(--text-1);
+      line-height: 1.3;
+    }
+
+    .tlp-badge {
+      font-size: 0.62rem;
+      font-family: var(--font-mono);
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-weight: 600;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .tlp-white  { background: rgba(255,255,255,0.1); color: #aaa; }
+    .tlp-green  { background: rgba(6,214,160,0.15);  color: #06d6a0; }
+    .tlp-amber  { background: rgba(244,162,97,0.15); color: #f4a261; }
+    .tlp-red    { background: rgba(239,35,60,0.15);  color: #ef233c; }
+
+    .pulse-desc {
+      font-size: 0.78rem;
+      color: var(--text-2);
+      margin-bottom: 10px;
+      line-height: 1.5;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    .pulse-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      margin-bottom: 10px;
+    }
+
+    .tag {
+      font-size: 0.65rem;
+      padding: 2px 6px;
+      background: rgba(0,180,216,0.1);
+      border: 1px solid rgba(0,180,216,0.2);
+      color: var(--accent-dim);
+      border-radius: 3px;
+      font-family: var(--font-mono);
+    }
+
+    .pulse-footer {
+      font-size: 0.7rem;
+      color: var(--text-3);
+      font-family: var(--font-mono);
+      display: flex;
+      justify-content: space-between;
+    }
+
+    /* ── Loader / Spinner ──────────────────────────────────────── */
+    .loader {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 40px;
+      color: var(--text-2);
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+    }
+
+    .spinner {
+      width: 18px; height: 18px;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Error / Warning messages ──────────────────────────────── */
+    .msg-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 20px 24px;
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+    }
+
+    .msg-card.warn {
+      border-color: rgba(244,162,97,0.4);
+      color: var(--warning);
+    }
+
+    .msg-card.err {
+      border-color: rgba(239,35,60,0.4);
+      color: var(--danger);
+    }
+
+    .section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 14px;
+    }
+
+    .section-title {
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      color: var(--text-2);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+  </style>
+</head>
+
+<body>
+<div class="layout">
+
+  <!-- ================================================================
+       SIDEBAR
+       Contains: logo, navigation buttons, API status indicators
+  ================================================================ -->
+  <nav class="sidebar">
+
+    <div class="sidebar-logo">
+      <div class="name">🛡 ThreatIQ</div>
+      <div class="tagline">Threat Intelligence Platform</div>
+    </div>
+
+    <div class="nav-section">
+      <div class="nav-label">Navigation</div>
+      <button class="nav-btn active" onclick="showPage('dashboard')">
+        <span class="nav-icon">📊</span> Dashboard
+      </button>
+      <button class="nav-btn" onclick="showPage('feed')">
+        <span class="nav-icon">📰</span> Threat Feed
+      </button>
+      <button class="nav-btn" onclick="showPage('ioc')">
+        <span class="nav-icon">🔍</span> IOC Lookup
+      </button>
+      <button class="nav-btn" onclick="showPage('briefing')">
+        <span class="nav-icon">🤖</span> AI Briefing
+      </button>
+      <button class="nav-btn" onclick="showPage('otx')">
+        <span class="nav-icon">📡</span> OTX Pulses
+      </button>
+    </div>
+
+    <!-- API Status — fetched from /api/status on load -->
+    <div class="api-status">
+      <div class="api-status-title">API Status</div>
+      <div class="api-row"><span>Gemini</span>    <div class="dot" id="dot-gemini"></div></div>
+      <div class="api-row"><span>AbuseIPDB</span> <div class="dot" id="dot-abuse"></div></div>
+      <div class="api-row"><span>VirusTotal</span><div class="dot" id="dot-vt"></div></div>
+      <div class="api-row"><span>OTX</span>       <div class="dot" id="dot-otx"></div></div>
+    </div>
+
+  </nav>
+
+  <!-- ================================================================
+       MAIN CONTENT AREA
+       Five page sections — only one is .active at a time
+  ================================================================ -->
+  <main class="main">
+
+    <!-- ============================================================
+         PAGE: DASHBOARD
+    ============================================================ -->
+    <div class="page-section active" id="page-dashboard">
+
+      <div class="page-header">
+        <div style="display:flex;align-items:center;gap:12px;">
+          <h1 class="page-title">Dashboard</h1>
+          <span class="live-badge"><span class="live-dot"></span>Live feeds</span>
+        </div>
+        <p class="page-subtitle">Aggregated threat intelligence from <span id="feed-count">6</span> open-source feeds</p>
+      </div>
+
+      <!-- Stat cards — populated by JS -->
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="label">Total Articles</div>
+          <div class="value" id="stat-total">—</div>
+          <div class="sublabel">Across all feeds</div>
+        </div>
+        <div class="stat-card">
+          <div class="label">Malware Alerts</div>
+          <div class="value" id="stat-malware" style="color:var(--danger)">—</div>
+          <div class="sublabel">Articles this cycle</div>
+        </div>
+        <div class="stat-card">
+          <div class="label">Vulnerabilities</div>
+          <div class="value" id="stat-vuln" style="color:var(--purple)">—</div>
+          <div class="sublabel">CVEs & exploits</div>
+        </div>
+        <div class="stat-card">
+          <div class="label">Active Feeds</div>
+          <div class="value" id="stat-feeds" style="color:var(--success)">6</div>
+          <div class="sublabel">RSS sources online</div>
+        </div>
+      </div>
+
+      <!-- Charts -->
+      <div class="charts-grid">
+        <div class="chart-card">
+          <div class="chart-title">Threat Category Distribution</div>
+          <div class="chart-wrap">
+            <canvas id="chartCategories"></canvas>
+          </div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-title">Articles by Source</div>
+          <div class="chart-wrap">
+            <canvas id="chartSources"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Latest articles preview -->
+      <div class="section-header">
+        <div class="section-title">Latest Threats</div>
+        <button class="filter-btn active" onclick="showPage('feed')" style="font-size:0.75rem;">View all →</button>
+      </div>
+      <div class="articles-grid" id="dashboard-articles">
+        <div class="loader"><div class="spinner"></div> Loading threat feed...</div>
+      </div>
+
+    </div>
+
+    <!-- ============================================================
+         PAGE: THREAT FEED
+    ============================================================ -->
+    <div class="page-section" id="page-feed">
+
+      <div class="page-header">
+        <h1 class="page-title">Threat Feed</h1>
+        <p class="page-subtitle">Security news aggregated in real-time from trusted sources</p>
+      </div>
+
+      <div class="filter-bar" id="filter-bar">
+        <button class="filter-btn active" onclick="filterFeed('all', this)">All</button>
+        <button class="filter-btn" onclick="filterFeed('Malware', this)">Malware</button>
+        <button class="filter-btn" onclick="filterFeed('Phishing', this)">Phishing</button>
+        <button class="filter-btn" onclick="filterFeed('Vulnerability', this)">Vulnerability</button>
+        <button class="filter-btn" onclick="filterFeed('Data Breach', this)">Data Breach</button>
+        <button class="filter-btn" onclick="filterFeed('APT / Nation State', this)">APT</button>
+        <button class="filter-btn" onclick="filterFeed('General', this)">General</button>
+      </div>
+
+      <div class="articles-grid" id="feed-articles">
+        <div class="loader"><div class="spinner"></div> Fetching threat feed...</div>
+      </div>
+
+    </div>
+
+    <!-- ============================================================
+         PAGE: IOC LOOKUP
+         IOC = Indicator of Compromise
+         An IOC is evidence that a system has been compromised:
+         malicious IPs, file hashes, domains, etc.
+    ============================================================ -->
+    <div class="page-section" id="page-ioc">
+
+      <div class="page-header">
+        <h1 class="page-title">IOC Lookup</h1>
+        <p class="page-subtitle">Check IP addresses against AbuseIPDB · Check file hashes against VirusTotal</p>
+      </div>
+
+      <div class="ioc-tabs">
+        <button class="ioc-tab active" onclick="switchIOCTab('ip', this)">🌐 IP Reputation</button>
+        <button class="ioc-tab" onclick="switchIOCTab('hash', this)">🔐 File Hash</button>
+      </div>
+
+      <!-- IP Tab -->
+      <div class="ioc-panel active" id="ioc-ip">
+        <div class="input-row">
+          <input class="ioc-input" id="ip-input" type="text"
+            placeholder="Enter IPv4 or IPv6 address  e.g. 185.220.101.45"
+            onkeydown="if(event.key==='Enter') lookupIP()">
+          <button class="lookup-btn" onclick="lookupIP()" id="ip-btn">Check IP →</button>
+        </div>
+        <div id="ip-result">
+          <div class="msg-card" style="color:var(--text-2);">
+            Enter an IP address above to check its abuse confidence score,
+            country of origin, and recent report history via AbuseIPDB.
+            <br><br>
+            <strong>Try these:</strong> 185.220.101.45 (Tor exit node) · 45.33.32.156 (scanner) · 8.8.8.8 (benign)
+          </div>
+        </div>
+      </div>
+
+      <!-- Hash Tab -->
+      <div class="ioc-panel" id="ioc-hash">
+        <div class="input-row">
+          <input class="ioc-input" id="hash-input" type="text"
+            placeholder="Enter MD5, SHA-1, or SHA-256 hash"
+            onkeydown="if(event.key==='Enter') lookupHash()">
+          <button class="lookup-btn" onclick="lookupHash()" id="hash-btn">Check Hash →</button>
+        </div>
+        <div id="hash-result">
+          <div class="msg-card" style="color:var(--text-2);">
+            Enter a file hash above to check it against 70+ antivirus engines
+            via VirusTotal. Supports MD5, SHA-1, and SHA-256.
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ============================================================
+         PAGE: AI BRIEFING
+    ============================================================ -->
+    <div class="page-section" id="page-briefing">
+
+      <div class="page-header">
+        <h1 class="page-title">AI Threat Briefing</h1>
+        <p class="page-subtitle">Gemini analyzes today's security headlines and generates a SOC-ready briefing</p>
+      </div>
+
+      <button class="generate-btn" onclick="generateBriefing()" id="briefing-btn">
+        <span>⚡</span> Generate Today's Briefing
+      </button>
+
+      <div id="briefing-output">
+        <div class="msg-card" style="color:var(--text-2);">
+          Click the button above to generate a real-time threat intelligence briefing.
+          Gemini will analyze the latest headlines from all RSS feeds and produce
+          a professional SOC-style briefing with threat level assessment.
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ============================================================
+         PAGE: OTX PULSES
+    ============================================================ -->
+    <div class="page-section" id="page-otx">
+
+      <div class="page-header">
+        <h1 class="page-title">OTX Threat Pulses</h1>
+        <p class="page-subtitle">Crowd-sourced threat intelligence from AlienVault Open Threat Exchange</p>
+      </div>
+
+      <div id="otx-output">
+        <div class="loader"><div class="spinner"></div> Loading OTX pulses...</div>
+      </div>
+
+    </div>
+
+  </main><!-- /main -->
+</div><!-- /layout -->
+
+<script>
+  // ===========================================================================
+  // ThreatIQ — Frontend JavaScript
+  // ===========================================================================
+  //
+  // This script handles:
+  //   1. Page navigation (show/hide sections)
+  //   2. API calls to the FastAPI backend
+  //   3. Rendering data as HTML cards and charts
+  //   4. IOC lookup interactivity
+  //
+  // KEY CONCEPT — fetch():
+  //   The Fetch API is the modern way for JavaScript to make HTTP requests.
+  //   fetch('/api/news') sends a GET request to our FastAPI backend.
+  //   It returns a Promise — the result arrives asynchronously (async/await).
+  //
+  // KEY CONCEPT — async/await:
+  //   async functions let you use await to pause until a Promise resolves.
+  //   Without await, you'd have to chain .then() callbacks everywhere.
+  // ===========================================================================
+
+  // ── State ──────────────────────────────────────────────────────────────────
+  // Keep the full article list in memory so we can filter without re-fetching
+  let allArticles    = [];
+  let chartsRendered = false;
+
+  // ── 1. Navigation ──────────────────────────────────────────────────────────
+
+  function showPage(pageName) {
+    // Hide all page sections
+    document.querySelectorAll('.page-section').forEach(el => el.classList.remove('active'));
+    // Show the requested section
+    document.getElementById('page-' + pageName).classList.add('active');
+
+    // Update active state on sidebar nav buttons
+    document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
+    // Find the button whose onclick contains the page name and mark it active
+    document.querySelectorAll('.nav-btn').forEach(btn => {
+      if (btn.getAttribute('onclick')?.includes("'" + pageName + "'")) {
+        btn.classList.add('active');
+      }
+    });
+
+    // Lazy-load page data when first visited
+    if (pageName === 'feed' && allArticles.length === 0) loadFeed();
+    if (pageName === 'briefing') { /* briefing generates on button click */ }
+    if (pageName === 'otx')  loadOTX();
+  }
+
+  // ── 2. Category badge helper ────────────────────────────────────────────────
+
+  function categoryClass(cat) {
+    const map = {
+      'Malware':           'malware',
+      'Phishing':          'phishing',
+      'Vulnerability':     'vulnerability',
+      'Data Breach':       'data-breach',
+      'APT / Nation State':'apt',
+    };
+    return 'badge-' + (map[cat] || 'general');
+  }
+
+  // ── 3. Article card renderer ────────────────────────────────────────────────
+
+  function renderArticleCard(a) {
+    return `
+      <div class="article-card">
+        <div class="article-meta">
+          <span class="badge ${categoryClass(a.category)}">${a.category}</span>
+          <span class="badge badge-source">${a.source}</span>
+        </div>
+        <div class="article-title">
+          <a href="${a.link}" target="_blank" rel="noopener">${a.title}</a>
+        </div>
+        <div class="article-summary">${a.summary || 'No summary available.'}</div>
+        <div class="article-date">${a.published || ''}</div>
+      </div>
+    `;
+  }
+
+  // ── 4. Dashboard Loader ────────────────────────────────────────────────────
+
+  async function loadDashboard() {
+    try {
+      // Fetch stats and articles in parallel
+      const [statsRes, newsRes] = await Promise.all([
+        fetch('/api/stats'),
+        fetch('/api/news?limit=6')
+      ]);
+
+      const stats = await statsRes.json();
+      const news  = await newsRes.json();
+
+      // Update stat cards
+      document.getElementById('stat-total').textContent   = stats.total_articles || '—';
+      document.getElementById('stat-malware').textContent = stats.category_distribution?.['Malware'] || 0;
+      document.getElementById('stat-vuln').textContent    = stats.category_distribution?.['Vulnerability'] || 0;
+      document.getElementById('stat-feeds').textContent   = stats.feed_count || 6;
+
+      // Render 6 latest article cards
+      const container = document.getElementById('dashboard-articles');
+      const articles  = news.articles || [];
+      container.innerHTML = articles.length
+        ? articles.map(renderArticleCard).join('')
+        : '<div class="msg-card warn">Could not load articles. Check your internet connection.</div>';
+
+      // Store all articles for the feed page
+      allArticles = articles;
+
+      // Render Chart.js charts (only once)
+      if (!chartsRendered) {
+        renderCharts(stats);
+        chartsRendered = true;
+      }
+
+    } catch (err) {
+      console.error('Dashboard load error:', err);
+      document.getElementById('dashboard-articles').innerHTML =
+        `<div class="msg-card err">Failed to load feed: ${err.message}</div>`;
+    }
+  }
+
+  // ── 5. Chart.js Charts ─────────────────────────────────────────────────────
+  //
+  // Chart.js is a JavaScript library for drawing charts using the HTML <canvas> element.
+  // We load it from a CDN (Content Delivery Network) — a globally distributed server
+  // that delivers library files quickly without us hosting them ourselves.
+  //
+  // new Chart(canvas, config) — creates a chart on a canvas element.
+  // The config has:
+  //   type  — 'doughnut', 'bar', 'line', etc.
+  //   data  — labels + datasets
+  //   options — styling/behavior
+
+  function renderCharts(stats) {
+    const cats    = stats.category_distribution || {};
+    const sources = stats.source_distribution   || {};
+
+    // Donut chart: threat categories
+    const catCanvas = document.getElementById('chartCategories');
+    if (catCanvas) {
+      new Chart(catCanvas, {
+        type: 'doughnut',
+        data: {
+          labels:   Object.keys(cats),
+          datasets: [{
+            data:            Object.values(cats),
+            backgroundColor: ['#ef233c','#f4a261','#9d4edd','#00b4d8','#ff4d6d','#7090ae'],
+            borderColor:     '#0d1829',
+            borderWidth:     2,
+            hoverOffset:     6,
+          }]
+        },
+        options: {
+          responsive:          true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              position: 'right',
+              labels: {
+                color:    '#7090ae',
+                font:     { size: 11, family: "'IBM Plex Mono', monospace" },
+                boxWidth: 12,
+                padding:  10,
+              }
+            }
+          }
+        }
+      });
+    }
+
+    // Horizontal bar chart: articles per source
+    const srcCanvas = document.getElementById('chartSources');
+    if (srcCanvas) {
+      new Chart(srcCanvas, {
+        type: 'bar',
+        data: {
+          labels:   Object.keys(sources).map(s => s.length > 18 ? s.substring(0, 16) + '…' : s),
+          datasets: [{
+            label:           'Articles',
+            data:            Object.values(sources),
+            backgroundColor: 'rgba(0,180,216,0.3)',
+            borderColor:     '#00b4d8',
+            borderWidth:     1,
+            borderRadius:    4,
+          }]
+        },
+        options: {
+          indexAxis:           'y',  // Horizontal bars
+          responsive:          true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false }
+          },
+          scales: {
+            x: {
+              grid:  { color: '#1a2f48' },
+              ticks: { color: '#7090ae', font: { size: 10, family: "'IBM Plex Mono'" } }
+            },
+            y: {
+              grid:  { display: false },
+              ticks: { color: '#7090ae', font: { size: 10, family: "'IBM Plex Mono'" } }
+            }
+          }
+        }
+      });
+    }
+  }
+
+  // ── 6. Threat Feed ──────────────────────────────────────────────────────────
+
+  async function loadFeed() {
+    const container = document.getElementById('feed-articles');
+    container.innerHTML = '<div class="loader"><div class="spinner"></div> Fetching all feeds...</div>';
+
+    try {
+      const res  = await fetch('/api/news?limit=40');
+      const data = await res.json();
+      allArticles = data.articles || [];
+      renderFeed(allArticles);
+    } catch (err) {
+      container.innerHTML = `<div class="msg-card err">Error: ${err.message}</div>`;
+    }
+  }
+
+  function renderFeed(articles) {
+    const container = document.getElementById('feed-articles');
+    container.innerHTML = articles.length
+      ? articles.map(renderArticleCard).join('')
+      : '<div class="msg-card warn">No articles match this filter.</div>';
+  }
+
+  function filterFeed(category, btn) {
+    // Update active state on filter buttons
+    document.querySelectorAll('#filter-bar .filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+
+    // Filter from the cached allArticles array (no extra network request)
+    const filtered = category === 'all'
+      ? allArticles
+      : allArticles.filter(a => a.category === category);
+
+    renderFeed(filtered);
+  }
+
+  // ── 7. IOC Tab Switching ────────────────────────────────────────────────────
+
+  function switchIOCTab(tab, btn) {
+    // Hide all panels, show selected
+    document.querySelectorAll('.ioc-panel').forEach(p => p.classList.remove('active'));
+    document.getElementById('ioc-' + tab).classList.add('active');
+
+    // Update tab buttons
+    document.querySelectorAll('.ioc-tab').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+  }
+
+  // ── 8. IP Lookup ────────────────────────────────────────────────────────────
+
+  async function lookupIP() {
+    const input = document.getElementById('ip-input');
+    const btn   = document.getElementById('ip-btn');
+    const ip    = input.value.trim();
+
+    if (!ip) return;
+
+    // Show loading state
+    btn.disabled = true;
+    btn.textContent = 'Checking...';
+    document.getElementById('ip-result').innerHTML =
+      '<div class="loader"><div class="spinner"></div> Querying AbuseIPDB...</div>';
+
+    try {
+      const res  = await fetch(`/api/ioc/ip/${encodeURIComponent(ip)}`);
+      const data = await res.json();
+
+      if (data.error) {
+        document.getElementById('ip-result').innerHTML =
+          `<div class="msg-card warn">⚠ ${data.error}</div>`;
+        return;
+      }
+
+      const score   = data.abuseConfidenceScore || 0;
+      const verdict = data.verdict || (score >= 75 ? 'MALICIOUS' : score >= 25 ? 'SUSPICIOUS' : 'CLEAN');
+
+      document.getElementById('ip-result').innerHTML = `
+        <div class="ioc-result">
+          <div class="verdict-banner">
+            <div>
+              <div style="font-family:var(--font-mono);font-size:1.1rem;color:var(--text-1);">${ip}</div>
+              <div style="font-size:0.75rem;color:var(--text-2);margin-top:2px;">${data.usageType || ''} · ${data.isp || ''}</div>
+            </div>
+            <div class="verdict-badge verdict-${verdict}">${verdict}</div>
+          </div>
+
+          <div class="ioc-fields">
+            <div class="ioc-field">
+              <div class="fk">Abuse Score</div>
+              <div class="fv">${score}%</div>
+              <div class="detection-bar" style="margin-top:6px;">
+                <div class="detection-fill" style="width:${score}%;background:${score>=75?'var(--danger)':score>=25?'var(--warning)':'var(--success)'}"></div>
+              </div>
+            </div>
+            <div class="ioc-field">
+              <div class="fk">Total Reports</div>
+              <div class="fv">${data.totalReports || 0}</div>
+            </div>
+            <div class="ioc-field">
+              <div class="fk">Country</div>
+              <div class="fv">${data.countryCode || 'Unknown'}</div>
+            </div>
+            <div class="ioc-field">
+              <div class="fk">ISP / Domain</div>
+              <div class="fv" style="font-size:0.78rem;">${data.domain || data.isp || 'Unknown'}</div>
+            </div>
+            <div class="ioc-field">
+              <div class="fk">Public IP</div>
+              <div class="fv">${data.isPublic ? 'Yes' : 'No'}</div>
+            </div>
+            <div class="ioc-field">
+              <div class="fk">Last Reported</div>
+              <div class="fv" style="font-size:0.78rem;">${data.lastReportedAt ? new Date(data.lastReportedAt).toLocaleDateString() : 'Never'}</div>
+            </div>
+          </div>
+        </div>
+      `;
+    } catch (err) {
+      document.getElementById('ip-result').innerHTML =
+        `<div class="msg-card err">Request failed: ${err.message}</div>`;
+    } finally {
+      btn.disabled    = false;
+      btn.textContent = 'Check IP →';
+    }
+  }
+
+  // ── 9. Hash Lookup ──────────────────────────────────────────────────────────
+
+  async function lookupHash() {
+    const input = document.getElementById('hash-input');
+    const btn   = document.getElementById('hash-btn');
+    const hash  = input.value.trim();
+
+    if (!hash) return;
+
+    btn.disabled    = true;
+    btn.textContent = 'Checking...';
+    document.getElementById('hash-result').innerHTML =
+      '<div class="loader"><div class="spinner"></div> Querying VirusTotal...</div>';
+
+    try {
+      const res  = await fetch(`/api/ioc/hash/${encodeURIComponent(hash)}`);
+      const data = await res.json();
+
+      if (data.error) {
+        document.getElementById('hash-result').innerHTML =
+          `<div class="msg-card warn">⚠ ${data.error}</div>`;
+        return;
+      }
+
+      const verdict    = data.verdict || 'UNKNOWN';
+      const detections = data.malicious  || 0;
+      const total      = data.total_engines || 1;
+      const pct        = Math.round((detections / total) * 100);
+
+      document.getElementById('hash-result').innerHTML = `
+        <div class="ioc-result">
+          <div class="verdict-banner">
+            <div>
+              <div style="font-family:var(--font-mono);font-size:0.82rem;color:var(--text-2);word-break:break-all;">${hash}</div>
+              <div style="font-size:0.78rem;color:var(--text-1);margin-top:4px;">${data.name || 'Unknown file'}</div>
+            </div>
+            <div class="verdict-badge verdict-${verdict}">${verdict}</div>
+          </div>
+
+          <div class="ioc-fields">
+            <div class="ioc-field" style="grid-column:1/-1">
+              <div class="fk">Detection Rate (${detections}/${total} engines)</div>
+              <div class="detection-bar" style="margin-top:6px;height:12px;">
+                <div class="detection-fill" style="width:${pct}%;background:${detections>=3?'var(--danger)':detections>=1?'var(--warning)':'var(--success)'}"></div>
+              </div>
+              <div style="font-size:0.72rem;color:var(--text-3);margin-top:4px;font-family:var(--font-mono);">
+                ${detections} malicious · ${data.suspicious||0} suspicious · ${data.clean||0} clean
+              </div>
+            </div>
+            <div class="ioc-field">
+              <div class="fk">File Type</div>
+              <div class="fv">${data.type || 'Unknown'}</div>
+            </div>
+            <div class="ioc-field">
+              <div class="fk">File Size</div>
+              <div class="fv">${data.size_bytes ? Math.round(data.size_bytes/1024) + ' KB' : 'Unknown'}</div>
+            </div>
+            <div class="ioc-field">
+              <div class="fk">First Seen</div>
+              <div class="fv" style="font-size:0.78rem;">${data.first_seen ? new Date(data.first_seen * 1000).toLocaleDateString() : 'Unknown'}</div>
+            </div>
+          </div>
+        </div>
+      `;
+    } catch (err) {
+      document.getElementById('hash-result').innerHTML =
+        `<div class="msg-card err">Request failed: ${err.message}</div>`;
+    } finally {
+      btn.disabled    = false;
+      btn.textContent = 'Check Hash →';
+    }
+  }
+
+  // ── 10. AI Briefing ──────────────────────────────────────────────────────────
+
+  async function generateBriefing() {
+    const btn    = document.getElementById('briefing-btn');
+    const output = document.getElementById('briefing-output');
+
+    btn.disabled    = true;
+    btn.innerHTML   = '<span>⏳</span> Generating briefing...';
+    output.innerHTML = '<div class="loader"><div class="spinner"></div> Gemini is analyzing today\'s headlines...</div>';
+
+    try {
+      const res  = await fetch('/api/briefing');
+      const data = await res.json();
+
+      if (data.error) {
+        output.innerHTML = `<div class="msg-card warn">⚠ ${data.error}</div>`;
+        return;
+      }
+
+      // Color-code sections by adding spans around keywords
+      let text = data.briefing || '';
+      text = text
+        .replace(/EXECUTIVE SUMMARY/g, '<span style="color:var(--accent);font-weight:600;">EXECUTIVE SUMMARY</span>')
+        .replace(/KEY THREATS/g,       '<span style="color:var(--warning);font-weight:600;">KEY THREATS</span>')
+        .replace(/NOTABLE THREAT ACTORS/g, '<span style="color:var(--purple);font-weight:600;">NOTABLE THREAT ACTORS</span>')
+        .replace(/RECOMMENDED ACTIONS/g,   '<span style="color:var(--success);font-weight:600;">RECOMMENDED ACTIONS</span>')
+        .replace(/THREAT LEVEL:\s*(CRITICAL)/g, 'THREAT LEVEL: <span style="color:var(--danger);font-weight:600;">CRITICAL</span>')
+        .replace(/THREAT LEVEL:\s*(HIGH)/g,     'THREAT LEVEL: <span style="color:var(--warning);font-weight:600;">HIGH</span>')
+        .replace(/THREAT LEVEL:\s*(MODERATE)/g, 'THREAT LEVEL: <span style="color:var(--success);font-weight:600;">MODERATE</span>')
+        .replace(/THREAT LEVEL:\s*(LOW)/g,      'THREAT LEVEL: <span style="color:var(--success);font-weight:600;">LOW</span>');
+
+      const generatedAt = new Date(data.generated_at).toLocaleString();
+
+      output.innerHTML = `
+        <div class="briefing-card">
+          <div class="briefing-text">${text}</div>
+          <div class="briefing-meta">
+            Generated: ${generatedAt} ·
+            Sources analyzed: ${data.sources_used?.join(', ') || 'Multiple'} ·
+            Headlines processed: ${data.headline_count || '—'}
+          </div>
+        </div>
+      `;
+    } catch (err) {
+      output.innerHTML = `<div class="msg-card err">Error: ${err.message}</div>`;
+    } finally {
+      btn.disabled  = false;
+      btn.innerHTML = '<span>⚡</span> Regenerate Briefing';
+    }
+  }
+
+  // ── 11. OTX Pulses ───────────────────────────────────────────────────────────
+
+  async function loadOTX() {
+    const container = document.getElementById('otx-output');
+    container.innerHTML = '<div class="loader"><div class="spinner"></div> Loading OTX pulses...</div>';
+
+    try {
+      const res  = await fetch('/api/otx/pulses');
+      const data = await res.json();
+
+      if (data.error) {
+        container.innerHTML = `
+          <div class="msg-card warn">
+            ⚠ ${data.error}
+            <br><br>
+            Register for a free OTX account at <strong>otx.alienvault.com</strong>,
+            then copy your API key to the OTX_KEY field in your .env file.
+          </div>`;
+        return;
+      }
+
+      const pulses = data.pulses || [];
+      if (pulses.length === 0) {
+        container.innerHTML = '<div class="msg-card" style="color:var(--text-2);">No pulses found. Try subscribing to more OTX feeds.</div>';
+        return;
+      }
+
+      const cards = pulses.map(p => `
+        <div class="pulse-card">
+          <div class="pulse-header">
+            <div class="pulse-name">${p.name}</div>
+            <span class="tlp-badge tlp-${p.tlp}">TLP:${p.tlp?.toUpperCase()}</span>
+          </div>
+          <div class="pulse-desc">${p.description || 'No description provided.'}</div>
+          <div class="pulse-tags">
+            ${(p.tags || []).map(t => `<span class="tag">${t}</span>`).join('')}
+          </div>
+          <div class="pulse-footer">
+            <span>By ${p.author}</span>
+            <span>${p.indicators_count} IOCs</span>
+          </div>
+        </div>
+      `).join('');
+
+      container.innerHTML = `<div class="pulses-grid">${cards}</div>`;
+
+    } catch (err) {
+      container.innerHTML = `<div class="msg-card err">Error: ${err.message}</div>`;
+    }
+  }
+
+  // ── 12. API Status Check ─────────────────────────────────────────────────────
+
+  async function checkStatus() {
+    try {
+      const res  = await fetch('/api/status');
+      const data = await res.json();
+
+      const map = {
+        'dot-gemini': data.gemini,
+        'dot-abuse':  data.abuseipdb,
+        'dot-vt':     data.virustotal,
+        'dot-otx':    data.otx,
+      };
+
+      for (const [id, ok] of Object.entries(map)) {
+        const el = document.getElementById(id);
+        if (el) el.className = 'dot' + (ok ? ' ok' : '');
+      }
+
+      if (data.rss_feeds) {
+        document.getElementById('feed-count').textContent = data.rss_feeds;
+      }
+    } catch (e) { /* status check failed — non-critical */ }
+  }
+
+  // ── 13. Init ─────────────────────────────────────────────────────────────────
+  // This runs as soon as the page loads (no DOMContentLoaded wrapper needed
+  // because this script tag is at the bottom of the body).
+
+  checkStatus();    // Show which API keys are configured
+  loadDashboard();  // Load stats + charts + latest articles
+
+</script>
+</body>
+</html>
