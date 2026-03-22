@@ -121,7 +121,9 @@ def _parse_feed_sync(source_name: str, feed_url: str, limit: int) -> list:
     """
     articles = []
     try:
-        feed = feedparser.parse(feed_url)
+        resp = httpx.get(feed_url, timeout=7.0, follow_redirects=True)
+        resp.raise_for_status()
+        feed = feedparser.parse(resp.text)
         for entry in feed.entries[:limit]:
             title   = entry.get("title", "No title")
             link    = entry.get("link", "#")
@@ -499,7 +501,12 @@ async def get_briefing():
             "sources_used":   list(RSS_FEEDS.keys()),
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Gemini error: {str(e)}")
+        return {
+            "briefing":       f"AI Generation Error: {str(e)}",
+            "generated_at":   datetime.now(timezone.utc).isoformat(),
+            "headline_count": len(headlines) if 'headlines' in locals() else 0,
+            "sources_used":   [],
+        }
 
 
 # ── Route: GET /api/status ────────────────────────────────────────────────────
