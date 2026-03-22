@@ -53,10 +53,8 @@ ABUSEIPDB_KEY   = os.environ.get("ABUSEIPDB_KEY")
 VIRUSTOTAL_KEY  = os.environ.get("VIRUSTOTAL_KEY")
 OTX_KEY         = os.environ.get("OTX_KEY")
 
-# Configure the Gemini SDK only if we have a key
-if GOOGLE_API_KEY:
-    genai.configure(api_key=GOOGLE_API_KEY)
-
+# The google-genai SDK does not use global configuration.
+# The client is instantiated where needed.
 # =============================================================================
 # ── 2. DATA SOURCES ───────────────────────────────────────────────────────────
 # These RSS feeds require NO API key — fully open and free.
@@ -489,7 +487,7 @@ async def get_briefing():
     """
 
     try:
-        client   = genai.Client()
+        client   = genai.Client(api_key=GOOGLE_API_KEY)
         response = client.models.generate_content(
             model="gemini-2.0-flash",
             contents=prompt
