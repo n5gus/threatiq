@@ -28,6 +28,8 @@
 
 import asyncio
 import os
+import json
+import time
 import re
 from collections import defaultdict
 from datetime import datetime, timezone
@@ -52,6 +54,10 @@ GOOGLE_API_KEY  = os.environ.get("GOOGLE_API_KEY")
 ABUSEIPDB_KEY   = os.environ.get("ABUSEIPDB_KEY")
 VIRUSTOTAL_KEY  = os.environ.get("VIRUSTOTAL_KEY")
 OTX_KEY         = os.environ.get("OTX_KEY")
+
+# Caching for AI Briefing
+BRIEFING_CACHE_FILE  = "briefing_cache.json"
+CACHE_EXPIRY_SECONDS = 3600  # 1 hour
 
 # The google-genai SDK does not use global configuration.
 # The client is instantiated where needed.
@@ -426,14 +432,28 @@ async def get_otx_pulses():
 # based on the current day's security news headlines.
 
 @app.get("/api/briefing")
-async def get_briefing():
+async def get_briefing(refresh: bool = False):
     """
     Generate an AI-powered threat intelligence briefing using Gemini 2.0 Flash.
-    Pulls current headlines from all RSS feeds, then asks Gemini to synthesize
-    them into a professional SOC-style briefing.
+    Includes a file-based cache to stay within free tier API quotas.
     """
     if not GOOGLE_API_KEY:
         return {"error": "GOOGLE_API_KEY not configured. Get a free key at aistudio.google.com"}
+
+    # 1. Check if we have a valid cached briefing first
+    if not refresh and os.path.exists(BRIEFING_CACHE_FILE):
+        try:
+            with open(BRIEFING_CACHE_FILE, "r") as f:
+                cache_data = json.load(f)
+            
+            # Check if cache is still valid (less than 1 hour old)
+            cache_time = cache_data.get("generated_at_unix", 0)
+            if (time.time() - cache_time) < CACHE_EXPIRY_SECONDS:
+                return cache_data
+        except Exception:
+            pass # If cache is corrupt, proceed to generate a fresh one
+
+    # 2. Collect headlines from all feeds (needed if refresh or cache expired)
 
     # Collect headlines from all feeds
     loop = asyncio.get_event_loop()
@@ -494,12 +514,22 @@ async def get_briefing():
             model="gemini-2.0-flash",
             contents=prompt
         )
-        return {
+        result = {
             "briefing":       response.text,
             "generated_at":   datetime.now(timezone.utc).isoformat(),
+            "generated_at_unix": time.time(), # Added for TTL checks
             "headline_count": len(headlines),
             "sources_used":   list(RSS_FEEDS.keys()),
         }
+
+        # Save to cache file for subsequent loads
+        try:
+            with open(BRIEFING_CACHE_FILE, "w") as f:
+                json.dump(result, f, indent=2)
+        except Exception:
+            pass # Even if cache saving fails, return the new result
+
+        return result
     except Exception as e:
         return {
             "briefing":       f"AI Generation Error: {str(e)}",
