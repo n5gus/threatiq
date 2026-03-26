@@ -428,6 +428,7 @@ async def get_otx_pulses(refresh: bool = False):
             pulses = []
             for pulse in data.get("results", []):
                 pulses.append({
+                    "id":               pulse.get("id", ""),
                     "name":             pulse.get("name", "Unnamed pulse"),
                     "description":      pulse.get("description", "")[:300],
                     "tags":             pulse.get("tags", [])[:6],
@@ -539,7 +540,7 @@ async def get_briefing(refresh: bool = False):
     try:
         client   = genai.Client(api_key=GOOGLE_API_KEY)
         response = client.models.generate_content(
-            model="gemini-2.0-flash",
+            model="gemini-flash-latest",
             contents=prompt
         )
         result = {

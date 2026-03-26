@@ -6,3 +6,5 @@ __pycache__/
 *.log
 venv/
 .DS_Store
+briefing_cache.json
+otx_cache.json
