@@ -59,6 +59,10 @@ OTX_KEY         = os.environ.get("OTX_KEY")
 BRIEFING_CACHE_FILE  = "briefing_cache.json"
 CACHE_EXPIRY_SECONDS = 3600  # 1 hour
 
+# Caching for OTX Pulses
+OTX_CACHE_FILE       = "otx_cache.json"
+OTX_CACHE_EXPIRY_SECONDS = 600  # 10 minutes
+
 # The google-genai SDK does not use global configuration.
 # The client is instantiated where needed.
 # =============================================================================
@@ -389,13 +393,27 @@ async def check_hash(file_hash: str):
 # Each pulse contains IOCs (IPs, domains, hashes) and context about a threat.
 
 @app.get("/api/otx/pulses")
-async def get_otx_pulses():
+async def get_otx_pulses(refresh: bool = False):
     """
     Fetch the latest threat intelligence pulses from AlienVault OTX.
     Each pulse is a crowd-sourced threat report with IOCs and context.
+    Includes a file-based cache to stay within free tier API quotas.
     """
     if not OTX_KEY:
         return {"error": "OTX_KEY not configured. Register free at otx.alienvault.com", "configured": False}
+
+    # 1. Check if we have a valid cached OTX pulses first
+    if not refresh and os.path.exists(OTX_CACHE_FILE):
+        try:
+            with open(OTX_CACHE_FILE, "r") as f:
+                cache_data = json.load(f)
+            
+            # Check if cache is still valid (less than 10 minutes old)
+            cache_time = cache_data.get("generated_at_unix", 0)
+            if (time.time() - cache_time) < OTX_CACHE_EXPIRY_SECONDS:
+                return cache_data
+        except Exception:
+            pass # If cache is corrupt, proceed to generate a fresh one
 
     async with httpx.AsyncClient() as client:
         try:
@@ -421,7 +439,16 @@ async def get_otx_pulses():
                     "tlp":              pulse.get("tlp", "white"),
                 })
 
-            return {"configured": True, "pulses": pulses, "count": len(pulses)}
+            result = {"configured": True, "pulses": pulses, "count": len(pulses), "generated_at_unix": time.time()}
+
+            # Save to cache file for subsequent loads
+            try:
+                with open(OTX_CACHE_FILE, "w") as f:
+                    json.dump(result, f, indent=2)
+            except Exception:
+                pass # Even if cache saving fails, return the new result
+
+            return result
 
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
@@ -441,15 +468,16 @@ async def get_briefing(refresh: bool = False):
         return {"error": "GOOGLE_API_KEY not configured. Get a free key at aistudio.google.com"}
 
     # 1. Check if we have a valid cached briefing first
-    if not refresh and os.path.exists(BRIEFING_CACHE_FILE):
+    old_cache = None
+    if os.path.exists(BRIEFING_CACHE_FILE):
         try:
             with open(BRIEFING_CACHE_FILE, "r") as f:
-                cache_data = json.load(f)
+                old_cache = json.load(f)
             
             # Check if cache is still valid (less than 1 hour old)
-            cache_time = cache_data.get("generated_at_unix", 0)
-            if (time.time() - cache_time) < CACHE_EXPIRY_SECONDS:
-                return cache_data
+            cache_time = old_cache.get("generated_at_unix", 0)
+            if not refresh and (time.time() - cache_time) < CACHE_EXPIRY_SECONDS:
+                return old_cache
         except Exception:
             pass # If cache is corrupt, proceed to generate a fresh one
 
@@ -531,12 +559,27 @@ async def get_briefing(refresh: bool = False):
 
         return result
     except Exception as e:
-        return {
-            "briefing":       f"AI Generation Error: {str(e)}",
+        # If we failed due to an API error but already have a successful old cache, fall back to it
+        if old_cache and "AI Generation Error" not in old_cache.get("briefing", ""):
+            old_cache["briefing"] += f"\n\n[Warning: Background refresh failed: {str(e)}]"
+            return old_cache
+
+        error_result = {
+            "briefing":       f"AI Generation Error: {str(e)}\n\n(This error was cached to protect quotas. Try again later.)",
             "generated_at":   datetime.now(timezone.utc).isoformat(),
+            "generated_at_unix": time.time(), # Important: Cache error TTL
             "headline_count": len(headlines) if 'headlines' in locals() else 0,
             "sources_used":   [],
         }
+
+        # Cache the error response to stop endless hammering
+        try:
+            with open(BRIEFING_CACHE_FILE, "w") as f:
+                json.dump(error_result, f, indent=2)
+        except Exception:
+            pass
+
+        return error_result
 
 
 # ── Route: GET /api/status ────────────────────────────────────────────────────
