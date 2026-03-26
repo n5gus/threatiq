@@ -1,4 +1,4 @@
-# 🛡️ ThreatIQ — Threat Intelligence Platform
+# ThreatIQ — Threat Intelligence Platform
 
 > Built with FastAPI + Gemini 2.0 Flash · Google Hackathon @ The LAB Miami · March 2025
 
@@ -8,20 +8,20 @@ APIs, AlienVault OTX pulses, and an AI-generated daily briefing into a single da
 
 ---
 
-## ✨ Features
+## Features
 
 | Feature | Data Source | Free? |
 |---|---|---|
-| 📰 **Threat Feed** | 6 RSS sources (Krebs, BleepingComputer, SANS, THN, etc.) | ✅ No key needed |
-| 📊 **Charts** | Derived from RSS (category + source distribution) | ✅ No key needed |
-| 🌐 **IP Reputation** | AbuseIPDB | ✅ 1,000/day free |
-| 🔐 **File Hash Lookup** | VirusTotal (70+ AV engines) | ✅ 500/day free |
-| 📡 **OTX Threat Pulses** | AlienVault OTX | ✅ Fully free |
-| 🤖 **AI Briefing** | Gemini 2.0 Flash | ✅ 1,500/day free |
+| **Threat Feed** | 6 RSS sources (Krebs, BleepingComputer, SANS, THN, etc.) | No key needed |
+| **Charts** | Derived from RSS (category + source distribution) | No key needed |
+| **IP Reputation** | AbuseIPDB | 1,000/day free |
+| **File Hash Lookup** | VirusTotal (70+ AV engines) | 500/day free |
+| **OTX Threat Pulses** | AlienVault OTX | Fully free |
+| **AI Briefing** | Gemini 2.0 Flash | 1,500/day free |
 
 ---
 
-## ⚙️ Setup
+## Setup
 
 ### Step 1 — Clone and Install
 ```bash
@@ -54,21 +54,21 @@ The `--reload` flag automatically restarts the server when you edit `main.py`.
 
 ---
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 threatiq/
-├── main.py            # 🔧 FastAPI backend — all API routes
+├── main.py            # FastAPI backend — all API routes
 ├── static/
-│   └── index.html     # 🖥️  Single-page dashboard (HTML + CSS + JS)
-├── requirements.txt   # 📦 Python dependencies
-├── .env.example       # 🔑 API key template
-└── README.md          # 📖 This file
+│   └── index.html     # Single-page dashboard (HTML + CSS + JS)
+├── requirements.txt   # Python dependencies
+├── .env.example       # API key template
+└── README.md          # This file
 ```
 
 ---
 
-## 🔌 API Endpoints
+## API Endpoints
 
 | Method | Path | Description |
 |---|---|---|
@@ -83,7 +83,7 @@ threatiq/
 
 ---
 
-## 🎯 Hackathon Demo Script
+## Hackathon Demo Script
 
 **1. Open the dashboard (30 seconds)**
 > Show the stats cards loading in real-time, then the threat category donut chart.
@@ -115,7 +115,7 @@ threatiq/
 
 ---
 
-## 🔧 Possible Enhancements
+## Possible Enhancements
 
 - **Email alerts** — use SendGrid (free tier) to email the daily briefing to the team
 - **MITRE ATT&CK mapping** — Gemini can map news articles to TTPs automatically
@@ -126,7 +126,7 @@ threatiq/
 
 ---
 
-## 📚 Key Concepts
+## Key Concepts
 
 **FastAPI** — Python web framework. `@app.get("/path")` creates an API endpoint.
 **async/await** — Asynchronous code lets multiple API calls run simultaneously.
