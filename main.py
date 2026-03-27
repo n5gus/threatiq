@@ -43,7 +43,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 
 # Load .env file into environment variables
-load_dotenv()
+load_dotenv(override=True)
 
 # =============================================================================
 # ── 1. CONFIGURATION ──────────────────────────────────────────────────────────
@@ -65,6 +65,14 @@ OTX_CACHE_EXPIRY_SECONDS = 600  # 10 minutes
 
 # The google-genai SDK does not use global configuration.
 # The client is instantiated where needed.
+
+def is_placeholder_key(key: str | None) -> bool:
+    """Check if an API key is missing or a placeholder value."""
+    if not key:
+        return True
+    placeholders = ["your_google_api_key_here", "your_abuseipdb_key_here", 
+                    "your_virustotal_key_here", "your_otx_key_here", "placeholder"]
+    return key.lower().strip() in placeholders
 # =============================================================================
 # ── 2. DATA SOURCES ───────────────────────────────────────────────────────────
 # These RSS feeds require NO API key — fully open and free.
@@ -141,11 +149,16 @@ def _parse_feed_sync(source_name: str, feed_url: str, limit: int) -> list:
             summary = strip_html(raw_sum)[:350]
             pub     = entry.get("published", entry.get("updated", "Unknown date"))
 
+            # Extract a numerical timestamp for sorting, or use current time if missing
+            struct_time = entry.get("published_parsed") or entry.get("updated_parsed")
+            timestamp   = time.mktime(struct_time) if struct_time else time.time()
+
             articles.append({
                 "title":     title,
                 "link":      link,
                 "summary":   summary,
                 "published": pub,
+                "timestamp": timestamp,
                 "source":    source_name,
                 "category":  categorize(title, summary),
             })
@@ -197,7 +210,7 @@ async def serve_dashboard():
 # Example: /api/news?category=Malware&limit=10
 
 @app.get("/api/news")
-async def get_news(category: str = "all", limit: int = 40):
+async def get_news(category: str = "all", limit: int = 100):
     """
     Aggregate security news from all RSS feeds.
     Fetches all feeds in parallel for speed (asyncio.gather).
@@ -208,7 +221,7 @@ async def get_news(category: str = "all", limit: int = 40):
     # blocking the async event loop. This is the standard pattern for
     # calling synchronous libraries (like feedparser) from async code.
     tasks = [
-        loop.run_in_executor(None, _parse_feed_sync, source, url, 8)
+        loop.run_in_executor(None, _parse_feed_sync, source, url, 20)
         for source, url in RSS_FEEDS.items()
     ]
 
@@ -220,6 +233,9 @@ async def get_news(category: str = "all", limit: int = 40):
     for result in results:
         if isinstance(result, list):   # Skip any feeds that threw exceptions
             all_articles.extend(result)
+
+    # Sort all articles by timestamp descending (newest first)
+    all_articles.sort(key=lambda x: x.get("timestamp", 0), reverse=True)
 
     # Apply category filter if specified
     if category.lower() != "all":
@@ -243,7 +259,7 @@ async def get_stats():
     """
     loop = asyncio.get_event_loop()
     tasks = [
-        loop.run_in_executor(None, _parse_feed_sync, source, url, 10)
+        loop.run_in_executor(None, _parse_feed_sync, source, url, 20)
         for source, url in RSS_FEEDS.items()
     ]
     results = await asyncio.gather(*tasks, return_exceptions=True)
@@ -280,9 +296,9 @@ async def check_ip(ip_address: str):
     Check an IP address's abuse reputation via AbuseIPDB API.
     Returns confidence score (0-100%), abuse categories, and recent reports.
     """
-    if not ABUSEIPDB_KEY:
+    if is_placeholder_key(ABUSEIPDB_KEY):
         # Graceful fallback — shows a message instead of crashing
-        return {"error": "ABUSEIPDB_KEY not configured. Add it to your .env file.", "configured": False}
+        return {"error": "ABUSEIPDB_KEY not configured or still a placeholder. Add it to your .env file.", "configured": False}
 
     # httpx.AsyncClient is an async HTTP client — the async equivalent of requests.
     # The 'async with' block ensures the connection is properly closed afterward.
@@ -332,8 +348,8 @@ async def check_hash(file_hash: str):
     Look up a file hash in VirusTotal's database.
     Returns detection count across 70+ AV engines and a CLEAN/MALICIOUS verdict.
     """
-    if not VIRUSTOTAL_KEY:
-        return {"error": "VIRUSTOTAL_KEY not configured. Add it to your .env file.", "configured": False}
+    if is_placeholder_key(VIRUSTOTAL_KEY):
+        return {"error": "VIRUSTOTAL_KEY not configured or still a placeholder. Add it to your .env file.", "configured": False}
 
     async with httpx.AsyncClient() as client:
         try:
@@ -399,8 +415,8 @@ async def get_otx_pulses(refresh: bool = False):
     Each pulse is a crowd-sourced threat report with IOCs and context.
     Includes a file-based cache to stay within free tier API quotas.
     """
-    if not OTX_KEY:
-        return {"error": "OTX_KEY not configured. Register free at otx.alienvault.com", "configured": False}
+    if is_placeholder_key(OTX_KEY):
+        return {"error": "OTX_KEY is not configured or is a placeholder. Register free at otx.alienvault.com and update your .env file.", "configured": False}
 
     # 1. Check if we have a valid cached OTX pulses first
     if not refresh and os.path.exists(OTX_CACHE_FILE):
@@ -465,8 +481,8 @@ async def get_briefing(refresh: bool = False):
     Generate an AI-powered threat intelligence briefing using Gemini 2.0 Flash.
     Includes a file-based cache to stay within free tier API quotas.
     """
-    if not GOOGLE_API_KEY:
-        return {"error": "GOOGLE_API_KEY not configured. Get a free key at aistudio.google.com"}
+    if is_placeholder_key(GOOGLE_API_KEY):
+        return {"error": "GOOGLE_API_KEY not configured or still a placeholder. Get a free key at aistudio.google.com"}
 
     # 1. Check if we have a valid cached briefing first
     old_cache = None
@@ -518,10 +534,10 @@ async def get_briefing(refresh: bool = False):
     [2-3 sentences summarizing today's threat landscape]
 
     KEY THREATS
-    • [Threat 1 — be specific, cite the source if relevant]
-    • [Threat 2]
-    • [Threat 3]
-    • [Threat 4 if warranted]
+    - [Threat 1 — be specific, cite the source if relevant]
+    - [Threat 2]
+    - [Threat 3]
+    - [Threat 4 if warranted]
 
     NOTABLE THREAT ACTORS
     [Any nation-state, APT group, or criminal organization mentioned. If none, write "No specific threat actor attribution in today's feed."]
@@ -534,7 +550,9 @@ async def get_briefing(refresh: bool = False):
     THREAT LEVEL: [LOW | MODERATE | HIGH | CRITICAL]
     [One sentence justification for the threat level]
 
-    Keep the briefing under 350 words. Use professional security operations language.
+    IMPORTANT: Do NOT use any markdown formatting such as asterisks (** or *) for bold or lists. 
+    Use plain hyphens (-) for bullet points. Keep the briefing under 350 words. 
+    Use professional security operations language.
     """
 
     try:
@@ -543,8 +561,12 @@ async def get_briefing(refresh: bool = False):
             model="gemini-flash-latest",
             contents=prompt
         )
+        
+        # Post-processing: remove any asterisks that Gemini might still include
+        clean_text = response.text.replace("*", "")
+        
         result = {
-            "briefing":       response.text,
+            "briefing":       clean_text,
             "generated_at":   datetime.now(timezone.utc).isoformat(),
             "generated_at_unix": time.time(), # Added for TTL checks
             "headline_count": len(headlines),
@@ -591,10 +613,10 @@ async def get_briefing(refresh: bool = False):
 async def get_status():
     """Return which API keys are configured (without revealing the actual keys)."""
     return {
-        "gemini":      bool(GOOGLE_API_KEY),
-        "abuseipdb":   bool(ABUSEIPDB_KEY),
-        "virustotal":  bool(VIRUSTOTAL_KEY),
-        "otx":         bool(OTX_KEY),
+        "gemini":      not is_placeholder_key(GOOGLE_API_KEY),
+        "abuseipdb":   not is_placeholder_key(ABUSEIPDB_KEY),
+        "virustotal":  not is_placeholder_key(VIRUSTOTAL_KEY),
+        "otx":         not is_placeholder_key(OTX_KEY),
         "rss_feeds":   len(RSS_FEEDS),
         "server_time": datetime.now(timezone.utc).isoformat(),
     }

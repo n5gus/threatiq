@@ -37,21 +37,21 @@
        by editing just this section.
     ============================================================ */
     :root {
-      --bg-base:       #05080f;   /* darkest background */
-      --bg-surface:    #0a1020;   /* sidebar, cards */
-      --bg-card:       #0d1829;   /* content cards */
-      --bg-input:      #0f1e33;   /* form inputs */
-      --accent:        #00b4d8;   /* primary cyan */
-      --accent-dim:    #0077a3;   /* dimmed cyan */
-      --success:       #06d6a0;   /* green for clean/low */
-      --warning:       #f4a261;   /* amber for suspicious/medium */
-      --danger:        #ef233c;   /* red for malicious/critical */
-      --purple:        #9d4edd;   /* purple for APT */
-      --text-1:        #d0e8ff;   /* primary text */
-      --text-2:        #7090ae;   /* secondary text */
-      --text-3:        #3a5570;   /* muted text */
-      --border:        #1a2f48;   /* card borders */
-      --border-hover:  #2a4a68;   /* hover state borders */
+      --bg-base:       #0f172a;   /* slightly lighter navy background */
+      --bg-surface:    #1e293b;   /* sidebar, cards */
+      --bg-card:       #1e293b;   /* content cards */
+      --bg-input:      #334155;   /* form inputs */
+      --accent:        #38bdf8;   /* brighter cyan */
+      --accent-dim:    #0ea5e9;   /* slightly darker cyan */
+      --success:       #10b981;   /* green for clean/low */
+      --warning:       #f59e0b;   /* amber for suspicious/medium */
+      --danger:        #ef4444;   /* red for malicious/critical */
+      --purple:        #8b5cf6;   /* purple for APT */
+      --text-1:        #f8fafc;   /* brighter primary text */
+      --text-2:        #cbd5e1;   /* secondary text */
+      --text-3:        #94a3b8;   /* muted text */
+      --border:        #334155;   /* card borders */
+      --border-hover:  #475569;   /* hover state borders */
       --font-mono:     'IBM Plex Mono', monospace;
       --font-sans:     'IBM Plex Sans', sans-serif;
     }
@@ -64,7 +64,7 @@
       background: var(--bg-base);
       color: var(--text-1);
       font-family: var(--font-sans);
-      font-size: 16px;
+      font-size: 18px; /* Increased base font size from 16px */
       line-height: 1.6;
     }
 
@@ -100,7 +100,7 @@
 
     .sidebar-logo .name {
       font-family: var(--font-mono);
-      font-size: 1.2rem;
+      font-size: 1.4rem; /* Increased from 1.2rem */
       font-weight: 600;
       color: var(--accent);
       letter-spacing: -0.5px;
@@ -137,7 +137,7 @@
       background: transparent;
       color: var(--text-2);
       font-family: var(--font-sans);
-      font-size: 0.85rem;
+      font-size: 1rem; /* Increased from 0.85rem */
       cursor: pointer;
       text-align: left;
       transition: all 0.15s;
@@ -209,7 +209,7 @@
 
     .page-title {
       font-family: var(--font-mono);
-      font-size: 1.3rem;
+      font-size: 1.6rem; /* Increased from 1.3rem */
       font-weight: 600;
       color: var(--text-1);
     }
@@ -275,7 +275,7 @@
 
     .stat-card .value {
       font-family: var(--font-mono);
-      font-size: 1.8rem;
+      font-size: 2.2rem; /* Increased from 1.8rem */
       font-weight: 600;
       color: var(--accent);
       margin: 6px 0 2px;
@@ -290,7 +290,7 @@
     /* ── Charts Grid ───────────────────────────────────────────── */
     .charts-grid {
       display: grid;
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns: 1fr;
       gap: 14px;
       margin-bottom: 24px;
     }
@@ -313,7 +313,7 @@
 
     .chart-wrap {
       position: relative;
-      height: 200px;
+      height: 320px;
     }
 
     /* ── Article Cards ─────────────────────────────────────────── */
@@ -366,7 +366,7 @@
     .badge-source       { background: rgba(0,180,216,0.1);   color: var(--accent-dim); }
 
     .article-title {
-      font-size: 0.88rem;
+      font-size: 1.1rem; /* Increased from 0.88rem */
       font-weight: 600;
       color: var(--text-1);
       line-height: 1.4;
@@ -381,11 +381,12 @@
     .article-title a:hover { color: var(--accent); }
 
     .article-summary {
-      font-size: 0.78rem;
+      font-size: 0.95rem; /* Increased from 0.78rem */
       color: var(--text-2);
       line-height: 1.5;
       display: -webkit-box;
       -webkit-line-clamp: 3;         /* Show max 3 lines, then "..." */
+      line-clamp: 3;                 /* Standard property for compatibility */
       -webkit-box-orient: vertical;
       overflow: hidden;
     }
@@ -587,7 +588,7 @@
 
     .briefing-text {
       font-family: var(--font-mono);
-      font-size: 0.82rem;
+      font-size: 1rem; /* Increased from 0.82rem */
       color: var(--text-1);
       line-height: 1.8;
       white-space: pre-wrap;   /* Preserve newlines from the API response */
@@ -662,6 +663,7 @@
       line-height: 1.5;
       display: -webkit-box;
       -webkit-line-clamp: 2;
+      line-clamp: 2;
       -webkit-box-orient: vertical;
       overflow: hidden;
     }
@@ -842,12 +844,6 @@
           <div class="chart-title">Threat Category Distribution</div>
           <div class="chart-wrap">
             <canvas id="chartCategories"></canvas>
-          </div>
-        </div>
-        <div class="chart-card">
-          <div class="chart-title">Articles by Source</div>
-          <div class="chart-wrap">
-            <canvas id="chartSources"></canvas>
           </div>
         </div>
       </div>
@@ -1059,7 +1055,7 @@
       // Fetch stats and articles in parallel
       const [statsRes, newsRes] = await Promise.all([
         fetch('/api/stats'),
-        fetch('/api/news?limit=6')
+        fetch('/api/news?limit=10')
       ]);
 
       const stats = await statsRes.json();
@@ -1071,7 +1067,7 @@
       document.getElementById('stat-vuln').textContent    = stats.category_distribution?.['Vulnerability'] || 0;
       document.getElementById('stat-feeds').textContent   = stats.feed_count || 6;
 
-      // Render 6 latest article cards
+      // Render latest article cards
       const container = document.getElementById('dashboard-articles');
       const articles  = news.articles || [];
       container.innerHTML = articles.length
@@ -1107,56 +1103,33 @@
   //   options — styling/behavior
 
   function renderCharts(stats) {
-    const cats    = stats.category_distribution || {};
-    const sources = stats.source_distribution   || {};
+    const cats = stats.category_distribution || {};
+    // Sort categories by count for a cleaner bar chart
+    const sortedLabels = Object.keys(cats).sort((a, b) => cats[b] - cats[a]);
+    const sortedData   = sortedLabels.map(l => cats[l]);
 
-    // Donut chart: threat categories
     const catCanvas = document.getElementById('chartCategories');
     if (catCanvas) {
       new Chart(catCanvas, {
-        type: 'doughnut',
-        data: {
-          labels:   Object.keys(cats),
-          datasets: [{
-            data:            Object.values(cats),
-            backgroundColor: ['#ef233c','#f4a261','#9d4edd','#00b4d8','#ff4d6d','#7090ae'],
-            borderColor:     '#0d1829',
-            borderWidth:     2,
-            hoverOffset:     6,
-          }]
-        },
-        options: {
-          responsive:          true,
-          maintainAspectRatio: false,
-          plugins: {
-            legend: {
-              position: 'right',
-              labels: {
-                color:    '#7090ae',
-                font:     { size: 11, family: "'IBM Plex Mono', monospace" },
-                boxWidth: 12,
-                padding:  10,
-              }
-            }
-          }
-        }
-      });
-    }
-
-    // Horizontal bar chart: articles per source
-    const srcCanvas = document.getElementById('chartSources');
-    if (srcCanvas) {
-      new Chart(srcCanvas, {
         type: 'bar',
         data: {
-          labels:   Object.keys(sources).map(s => s.length > 18 ? s.substring(0, 16) + '…' : s),
+          labels:   sortedLabels,
           datasets: [{
-            label:           'Articles',
-            data:            Object.values(sources),
-            backgroundColor: 'rgba(0,180,216,0.3)',
-            borderColor:     '#00b4d8',
+            label:           'Volume',
+            data:            sortedData,
+            backgroundColor: [
+              'rgba(239,35,60,0.3)',  // Malware
+              'rgba(244,162,97,0.3)', // Phishing
+              'rgba(157,78,221,0.3)', // Vuln
+              'rgba(0,180,216,0.3)',  // Breach
+              'rgba(239,35,60,0.4)',  // APT
+              'rgba(112,144,174,0.3)' // General
+            ],
+            borderColor: [
+              '#ef233c','#f4a261','#9d4edd','#00b4d8','#ff4d6d','#7090ae'
+            ],
             borderWidth:     1,
-            borderRadius:    4,
+            borderRadius:    5,
           }]
         },
         options: {
@@ -1164,16 +1137,19 @@
           responsive:          true,
           maintainAspectRatio: false,
           plugins: {
-            legend: { display: false }
+            legend: { display: false } // No legend needed for horizontal bars with labeled Y-axis
           },
           scales: {
             x: {
-              grid:  { color: '#1a2f48' },
-              ticks: { color: '#7090ae', font: { size: 10, family: "'IBM Plex Mono'" } }
+              grid:  { color: 'rgba(255,255,255,0.05)' },
+              ticks: { color: '#7090ae', font: { size: 11, family: "'IBM Plex Mono'" } }
             },
             y: {
               grid:  { display: false },
-              ticks: { color: '#7090ae', font: { size: 10, family: "'IBM Plex Mono'" } }
+              ticks: { 
+                color: '#f8fafc', 
+                font: { size: 12, family: "'IBM Plex Mono'", weight: '600' }
+              }
             }
           }
         }
@@ -1425,7 +1401,7 @@
       }
 
       const cards = pulses.map(p => `
-        <div class="pulse-card" onclick="window.open('https://otx.alienvault.com/pulse/' + p.id, '_blank')" style="cursor:pointer;">
+        <div class="pulse-card" onclick="window.open('https://otx.alienvault.com/pulse/${p.id}', '_blank')" style="cursor:pointer;">
           <div class="pulse-header">
             <div class="pulse-name">${p.name}</div>
             <span class="tlp-badge tlp-${p.tlp}">TLP:${p.tlp?.toUpperCase()}</span>
