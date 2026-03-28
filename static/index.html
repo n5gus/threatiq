@@ -365,6 +365,16 @@
     .badge-general      { background: rgba(112,144,174,0.15);color: #7090ae; }
     .badge-source       { background: rgba(0,180,216,0.1);   color: var(--accent-dim); }
 
+    /* Source favicon next to the badge */
+    .source-favicon {
+      width: 14px;
+      height: 14px;
+      border-radius: 3px;
+      object-fit: contain;
+      vertical-align: middle;
+      flex-shrink: 0;
+    }
+
     .article-title {
       font-size: 1.1rem; /* Increased from 0.88rem */
       font-weight: 600;
@@ -1032,12 +1042,31 @@
 
   // ── 3. Article card renderer ────────────────────────────────────────────────
 
+  // Map source display names → domains for favicon lookup
+  const SOURCE_DOMAINS = {
+    'Krebs on Security':    'krebsonsecurity.com',
+    'BleepingComputer':     'bleepingcomputer.com',
+    'SANS ISC':             'isc.sans.edu',
+    'The Hacker News':      'thehackernews.com',
+    'Schneier on Security': 'schneier.com',
+    'Threatpost':           'threatpost.com',
+  };
+
+  function sourceFaviconHTML(sourceName) {
+    const domain = SOURCE_DOMAINS[sourceName];
+    if (!domain) return '';
+    const url = `https://www.google.com/s2/favicons?sz=16&domain=${domain}`;
+    return `<img class="source-favicon" src="${url}" alt="" onerror="this.style.display='none'">`;
+  }
+
   function renderArticleCard(a) {
     return `
       <div class="article-card">
         <div class="article-meta">
           <span class="badge ${categoryClass(a.category)}">${a.category}</span>
-          <span class="badge badge-source">${a.source}</span>
+          <span class="badge badge-source" style="display:inline-flex;align-items:center;gap:4px;">
+            ${sourceFaviconHTML(a.source)}${a.source}
+          </span>
         </div>
         <div class="article-title">
           <a href="${a.link}" target="_blank" rel="noopener">${a.title}</a>
