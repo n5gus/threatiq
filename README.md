@@ -1,6 +1,6 @@
 # ThreatIQ — Threat Intelligence Platform
 
-> Built with FastAPI + Gemini 2.0 Flash · Google Hackathon @ The LAB Miami · March 2025
+> Built with FastAPI + Gemini 2.0 Flash
 
 ThreatIQ aggregates, categorizes, and visualizes security threat intelligence from
 multiple open-source feeds in real time. It combines free RSS feeds, IP/hash lookup
@@ -80,38 +80,6 @@ threatiq/
 | `GET` | `/api/otx/pulses` | AlienVault OTX threat pulses |
 | `GET` | `/api/briefing` | Gemini AI threat intelligence briefing |
 | `GET` | `/api/status` | Which API keys are configured |
-
----
-
-## Hackathon Demo Script
-
-**1. Open the dashboard (30 seconds)**
-> Show the stats cards loading in real-time, then the threat category donut chart.
-> "This data is being pulled live from 6 security news sources with zero delay."
-
-**2. Navigate to Threat Feed (45 seconds)**
-> Click category filters to show only Malware, then Vulnerability.
-> "The AI automatically categorizes every article using keyword analysis."
-
-**3. IOC Lookup — IP (45 seconds)**
-> Enter: `185.220.101.45` → show MALICIOUS verdict from AbuseIPDB
-> Enter: `8.8.8.8` → show CLEAN verdict
-> "This is the kind of check a SOC analyst does 50+ times a day — we made it one click."
-
-**4. IOC Lookup — Hash (30 seconds)**
-> Enter a known malware hash (find one on VirusTotal's public samples)
-> Show the 70+ engine detection rate bar
-
-**5. AI Briefing (1 minute)**
-> Click Generate → let Gemini produce the briefing live
-> "Gemini is synthesizing headlines from 6 sources into a SOC-ready briefing. This replaces
-> 30 minutes of manual review every morning."
-
-**6. OTX Pulses (30 seconds)**
-> Show the threat pulse grid with TLP badges and IOC counts
-> "This is crowd-sourced threat intel from 10,000+ security researchers globally."
-
-**Total demo time: ~4 minutes**
 
 ---
 
