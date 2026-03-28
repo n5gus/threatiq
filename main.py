@@ -403,6 +403,149 @@ async def check_hash(file_hash: str):
             raise HTTPException(status_code=500, detail=str(e))
 
 
+# ── Route: GET /api/ioc/domain/{domain} ──────────────────────────────────────
+# Checks a domain against VirusTotal's database.
+# VirusTotal aggregates category, reputation, and AV analysis for domains.
+
+@app.get("/api/ioc/domain/{domain}")
+async def check_domain(domain: str):
+    """
+    Look up a domain's reputation in VirusTotal.
+    Returns verdict, categories, reputation score, and AV engine analysis stats.
+    """
+    if is_placeholder_key(VIRUSTOTAL_KEY):
+        return {"error": "VIRUSTOTAL_KEY not configured or still a placeholder. Add it to your .env file.", "configured": False}
+
+    async with httpx.AsyncClient() as client:
+        try:
+            response = await client.get(
+                f"https://www.virustotal.com/api/v3/domains/{domain}",
+                headers={"x-apikey": VIRUSTOTAL_KEY},
+                timeout=15.0,
+            )
+
+            if response.status_code == 404:
+                return {
+                    "configured": True,
+                    "verdict": "NOT FOUND",
+                    "message": "This domain has not been analysed by VirusTotal yet."
+                }
+
+            if response.status_code != 200:
+                raise HTTPException(status_code=response.status_code, detail="VirusTotal API error")
+
+            data  = response.json()
+            attrs = data.get("data", {}).get("attributes", {})
+            stats = attrs.get("last_analysis_stats", {})
+
+            malicious  = stats.get("malicious", 0)
+            suspicious = stats.get("suspicious", 0)
+            total      = sum(stats.values()) or 1
+
+            # Flatten category values from multiple engines into a unique set
+            raw_cats   = attrs.get("categories", {})
+            categories = list(set(raw_cats.values()))[:6]
+
+            return {
+                "configured":    True,
+                "domain":        domain,
+                "reputation":    attrs.get("reputation", 0),
+                "registrar":     attrs.get("registrar", "Unknown"),
+                "creation_date": attrs.get("creation_date"),   # unix timestamp
+                "categories":    categories,
+                "malicious":     malicious,
+                "suspicious":    suspicious,
+                "clean":         stats.get("undetected", 0),
+                "total_engines": total,
+                "verdict": (
+                    "MALICIOUS"  if malicious >= 3 else
+                    "SUSPICIOUS" if malicious >= 1 or suspicious >= 2 else
+                    "CLEAN"
+                ),
+            }
+
+        except httpx.TimeoutException:
+            raise HTTPException(status_code=504, detail="VirusTotal request timed out")
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+
+# ── Route: GET /api/ioc/url ───────────────────────────────────────────────────
+# Submits a URL to VirusTotal for scanning, then polls for the analysis result.
+# Flow: POST /api/v3/urls → get analysis ID → poll GET /api/v3/analyses/{id}
+
+@app.get("/api/ioc/url")
+async def scan_url(url: str):
+    """
+    Submit a URL to VirusTotal and return the scan analysis result.
+    Submits the URL, then polls the analysis endpoint until status = completed.
+    """
+    if is_placeholder_key(VIRUSTOTAL_KEY):
+        return {"error": "VIRUSTOTAL_KEY not configured or still a placeholder. Add it to your .env file.", "configured": False}
+
+    async with httpx.AsyncClient() as client:
+        try:
+            # Step 1 — Submit the URL for scanning (form-encoded body as VT requires)
+            submit = await client.post(
+                "https://www.virustotal.com/api/v3/urls",
+                headers={"x-apikey": VIRUSTOTAL_KEY},
+                data={"url": url},
+                timeout=15.0,
+            )
+            submit.raise_for_status()
+            analysis_id = submit.json().get("data", {}).get("id", "")
+
+            if not analysis_id:
+                raise HTTPException(status_code=500, detail="VirusTotal did not return an analysis ID")
+
+            # Step 2 — Poll until the analysis is complete (usually 1-2 passes)
+            for attempt in range(6):
+                await asyncio.sleep(2 if attempt > 0 else 0.5)
+                poll = await client.get(
+                    f"https://www.virustotal.com/api/v3/analyses/{analysis_id}",
+                    headers={"x-apikey": VIRUSTOTAL_KEY},
+                    timeout=15.0,
+                )
+                poll.raise_for_status()
+                poll_data  = poll.json()
+                poll_attrs = poll_data.get("data", {}).get("attributes", {})
+
+                if poll_attrs.get("status") == "completed":
+                    stats      = poll_attrs.get("stats", {})
+                    malicious  = stats.get("malicious", 0)
+                    suspicious = stats.get("suspicious", 0)
+                    total      = sum(stats.values()) or 1
+
+                    return {
+                        "configured":    True,
+                        "url":           url,
+                        "analysis_id":   analysis_id,
+                        "malicious":     malicious,
+                        "suspicious":    suspicious,
+                        "clean":         stats.get("undetected", 0),
+                        "total_engines": total,
+                        "verdict": (
+                            "MALICIOUS"  if malicious >= 3 else
+                            "SUSPICIOUS" if malicious >= 1 or suspicious >= 2 else
+                            "CLEAN"
+                        ),
+                    }
+
+            # If still queued after 6 polls, return a partial result
+            return {
+                "configured":    True,
+                "url":           url,
+                "analysis_id":   analysis_id,
+                "verdict":       "PENDING",
+                "message":       "Analysis is still queued by VirusTotal. Try again in a few seconds.",
+            }
+
+        except httpx.TimeoutException:
+            raise HTTPException(status_code=504, detail="VirusTotal request timed out")
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+
 # ── Route: GET /api/otx/pulses ────────────────────────────────────────────────
 # AlienVault OTX (Open Threat Exchange) is a community threat intel platform.
 # "Pulses" are threat intelligence reports contributed by the community.

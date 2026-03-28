@@ -81,6 +81,10 @@
       grid-template-rows: 100vh;
       height: 100vh;
       overflow: hidden;
+      transition: grid-template-columns 0.25s ease;
+    }
+    .layout.sidebar-collapsed {
+      grid-template-columns: 0px 1fr;
     }
 
     /* ── Sidebar ───────────────────────────────────────────────── */
@@ -90,7 +94,58 @@
       display: flex;
       flex-direction: column;
       padding: 20px 0;
-      overflow-y: auto;
+      overflow: hidden;         /* hide text when collapsing */
+      transition: width 0.25s ease;
+      position: relative;
+      white-space: nowrap;
+    }
+
+    /* ── Sidebar toggle button (moved to main area top bar) ────── */
+    .sidebar-toggle {
+      width: 32px; height: 32px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--bg-input);
+      color: var(--text-2);
+      font-size: 16px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.15s;
+      flex-shrink: 0;
+    }
+    .sidebar-toggle:hover { background: var(--bg-card); color: var(--accent); border-color: var(--accent); }
+
+    /* ── Top bar ───────────────────────────────────────────────── */
+    .top-bar {
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+      gap: 16px;
+      padding: 12px 24px;
+      background: var(--bg-base);
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      z-index: 50;
+    }
+    .top-bar .logo-wrap {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .top-bar .logo-name {
+      font-family: var(--font-mono);
+      font-size: 1.2rem;
+      font-weight: 600;
+      color: var(--accent);
+      letter-spacing: -0.5px;
+    }
+    .top-bar .logo-tagline {
+      font-size: 0.7rem;
+      color: var(--text-3);
+      margin-top: 1px;
     }
 
     .sidebar-logo {
@@ -100,16 +155,24 @@
 
     .sidebar-logo .name {
       font-family: var(--font-mono);
-      font-size: 1.4rem; /* Increased from 1.2rem */
+      font-size: 1.4rem;
       font-weight: 600;
       color: var(--accent);
       letter-spacing: -0.5px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
     }
 
     .sidebar-logo .tagline {
       font-size: 0.72rem;
       color: var(--text-2);
       margin-top: 2px;
+      transition: opacity 0.2s;
+    }
+
+    .sidebar-logo .logo-text {
+      transition: opacity 0.2s;
     }
 
     .nav-section {
@@ -145,6 +208,10 @@
     }
 
     .nav-btn:hover { background: var(--bg-card); color: var(--text-1); }
+
+    .nav-btn-text, .nav-label {
+      transition: opacity 0.2s;
+    }
 
     /* Active nav button — highlighted with accent border */
     .nav-btn.active {
@@ -758,6 +825,18 @@
       text-transform: uppercase;
       letter-spacing: 0.08em;
     }
+
+    /* ── Leaflet attribution — keep it technically present but unobtrusive ── */
+    .leaflet-control-attribution {
+      background: transparent !important;
+      box-shadow: none !important;
+      font-size: 0.55rem !important;
+      opacity: 0.18;
+      transition: opacity 0.3s;
+      color: var(--text-3) !important;
+    }
+    .leaflet-control-attribution:hover { opacity: 0.55; }
+    .leaflet-control-attribution a { color: var(--text-3) !important; }
   </style>
 </head>
 
@@ -768,39 +847,35 @@
        SIDEBAR
        Contains: logo, navigation buttons, API status indicators
   ================================================================ -->
-  <nav class="sidebar">
-
+  <nav class="sidebar" id="sidebar">
     <div class="sidebar-logo">
-      <div class="name">🛡 ThreatIQ</div>
+      <div class="name"><span>🛡</span> <span class="logo-text">ThreatIQ</span></div>
       <div class="tagline">Threat Intelligence Platform</div>
     </div>
 
     <div class="nav-section">
       <div class="nav-label">Navigation</div>
       <button class="nav-btn active" onclick="showPage('dashboard')">
-        <span class="nav-icon">📊</span> Dashboard
-      </button>
-      <button class="nav-btn" onclick="showPage('map')">
-        <span class="nav-icon">🌍</span> Threat Map
-      </button>
-      <button class="nav-btn" onclick="showPage('ioc')">
-        <span class="nav-icon">🔍</span> IOC Lookup
+        <span class="nav-icon">📊</span><span class="nav-btn-text"> Dashboard</span>
       </button>
       <button class="nav-btn" onclick="showPage('briefing')">
-        <span class="nav-icon">🤖</span> AI Briefing
+        <span class="nav-icon">🤖</span><span class="nav-btn-text"> AI Briefing</span>
+      </button>
+      <button class="nav-btn" onclick="showPage('ioc')">
+        <span class="nav-icon">🔍</span><span class="nav-btn-text"> IOC Lookup</span>
       </button>
       <button class="nav-btn" onclick="showPage('otx')">
-        <span class="nav-icon">📡</span> OTX Pulses
+        <span class="nav-icon">📡</span><span class="nav-btn-text"> OTX Pulses</span>
       </button>
     </div>
 
     <!-- API Status — fetched from /api/status on load -->
     <div class="api-status">
       <div class="api-status-title">API Status</div>
-      <div class="api-row"><span>Gemini</span>    <div class="dot" id="dot-gemini"></div></div>
-      <div class="api-row"><span>AbuseIPDB</span> <div class="dot" id="dot-abuse"></div></div>
-      <div class="api-row"><span>VirusTotal</span><div class="dot" id="dot-vt"></div></div>
-      <div class="api-row"><span>OTX</span>       <div class="dot" id="dot-otx"></div></div>
+      <div class="api-row"><span class="api-row-label">Gemini</span>    <div class="dot" id="dot-gemini"></div></div>
+      <div class="api-row"><span class="api-row-label">AbuseIPDB</span> <div class="dot" id="dot-abuse"></div></div>
+      <div class="api-row"><span class="api-row-label">VirusTotal</span><div class="dot" id="dot-vt"></div></div>
+      <div class="api-row"><span class="api-row-label">OTX</span>       <div class="dot" id="dot-otx"></div></div>
     </div>
 
   </nav>
@@ -810,6 +885,16 @@
        Five page sections — only one is .active at a time
   ================================================================ -->
   <main class="main">
+
+    <!-- Top bar logo strip -->
+    <div class="top-bar">
+      <button class="sidebar-toggle" onclick="toggleSidebar()" title="Toggle sidebar" id="sidebar-toggle-btn">☰</button>
+      <div class="logo-wrap">
+        <div class="logo-name">🛡 ThreatIQ</div>
+        <div class="logo-tagline">Threat Intelligence Platform</div>
+      </div>
+      <div style="margin-left:auto;" class="live-badge"><span class="live-dot"></span>System Active</div>
+    </div>
 
     <!-- ============================================================
          PAGE: DASHBOARD
@@ -848,14 +933,12 @@
         </div>
       </div>
 
-      <!-- Charts -->
-      <div class="charts-grid">
-        <div class="chart-card">
-          <div class="chart-title">Threat Category Distribution</div>
-          <div class="chart-wrap">
-            <canvas id="chartCategories"></canvas>
-          </div>
-        </div>
+      <!-- Geospatial Threat Map (replaces chart) -->
+      <div class="section-header" style="margin-bottom:10px;">
+        <div class="section-title">Geospatial Threat Activity</div>
+      </div>
+      <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:24px;">
+        <div id="threatMap" style="width:100%;height:340px;border-radius:8px;"></div>
       </div>
 
       <!-- Latest articles preview -->
@@ -878,12 +961,14 @@
 
       <div class="page-header">
         <h1 class="page-title">IOC Lookup</h1>
-        <p class="page-subtitle">Check IP addresses against AbuseIPDB · Check file hashes against VirusTotal</p>
+        <p class="page-subtitle">IP reputation via AbuseIPDB · File hash, domain &amp; URL scanning via VirusTotal</p>
       </div>
 
       <div class="ioc-tabs">
         <button class="ioc-tab active" onclick="switchIOCTab('ip', this)">🌐 IP Reputation</button>
         <button class="ioc-tab" onclick="switchIOCTab('hash', this)">🔐 File Hash</button>
+        <button class="ioc-tab" onclick="switchIOCTab('domain', this)">🔎 Domain</button>
+        <button class="ioc-tab" onclick="switchIOCTab('url', this)">🔗 URL Scan</button>
       </div>
 
       <!-- IP Tab -->
@@ -916,6 +1001,39 @@
           <div class="msg-card" style="color:var(--text-2);">
             Enter a file hash above to check it against 70+ antivirus engines
             via VirusTotal. Supports MD5, SHA-1, and SHA-256.
+          </div>
+        </div>
+      </div>
+
+      <!-- Domain Tab -->
+      <div class="ioc-panel" id="ioc-domain">
+        <div class="input-row">
+          <input class="ioc-input" id="domain-input" type="text"
+            placeholder="Enter a domain  e.g. malicious-site.ru"
+            onkeydown="if(event.key==='Enter') lookupDomain()">
+          <button class="lookup-btn" onclick="lookupDomain()" id="domain-btn">Check Domain →</button>
+        </div>
+        <div id="domain-result">
+          <div class="msg-card" style="color:var(--text-2);">
+            Enter a domain to check its reputation, categories, and AV engine detections via VirusTotal.
+            <br><br>
+            <strong>Try these:</strong> ebay.com (benign) · malware.wicar.org (test malware) · phishtank.com (reference)
+          </div>
+        </div>
+      </div>
+
+      <!-- URL Scan Tab -->
+      <div class="ioc-panel" id="ioc-url">
+        <div class="input-row">
+          <input class="ioc-input" id="url-input" type="text"
+            placeholder="Enter a full URL  e.g. https://suspicious-site.com/payload"
+            onkeydown="if(event.key==='Enter') scanURL()">
+          <button class="lookup-btn" onclick="scanURL()" id="url-btn">Scan URL →</button>
+        </div>
+        <div id="url-result">
+          <div class="msg-card" style="color:var(--text-2);">
+            Submit a live URL to VirusTotal for scanning against 70+ AV engines and URL reputation databases.
+            Useful for checking suspicious links from phishing emails. Results usually return in 5–15 seconds.
           </div>
         </div>
       </div>
@@ -962,18 +1080,6 @@
 
     </div>
 
-    <!-- ============================================================
-         PAGE: THREAT MAP
-    ============================================================ -->
-    <div class="page-section" id="page-map">
-      <div class="page-header">
-        <h1 class="page-title">Geospatial Threat Map</h1>
-        <p class="page-subtitle">Real-time global threat activity and active proxy nodes</p>
-      </div>
-      <div class="map-card" style="background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:20px;height:500px;position:relative;">
-        <div id="threatMap" style="width:100%;height:100%;border-radius:8px;"></div>
-      </div>
-    </div>
 
   </main><!-- /main -->
 </div><!-- /layout -->
@@ -998,6 +1104,19 @@
   //   async functions let you use await to pause until a Promise resolves.
   //   Without await, you'd have to chain .then() callbacks everywhere.
   // ===========================================================================
+
+  // ── 0. Sidebar toggle ──────────────────────────────────────────────────────
+
+  function toggleSidebar() {
+    const layout = document.querySelector('.layout');
+    const btn    = document.getElementById('sidebar-toggle-btn');
+    const collapsed = layout.classList.toggle('sidebar-collapsed');
+    btn.textContent = collapsed ? '☰' : '◀';
+    // Let Leaflet know the container resized
+    if (mapInstance) {
+      setTimeout(() => mapInstance.invalidateSize(), 300); // Wait for transition
+    }
+  }
 
   // ── State ──────────────────────────────────────────────────────────────────
   // Keep the full article list in memory so we can filter without re-fetching
@@ -1024,7 +1143,6 @@
     // Lazy-load page data when first visited
     if (pageName === 'briefing') { /* briefing generates on button click */ }
     if (pageName === 'otx')  loadOTX();
-    if (pageName === 'map')  loadMap();
   }
 
   // ── 2. Category badge helper ────────────────────────────────────────────────
@@ -1131,11 +1249,26 @@
   //   data  — labels + datasets
   //   options — styling/behavior
 
+  // Fixed color palette keyed by category name — must match the badge CSS colors
+  const CATEGORY_COLORS = {
+    'Malware':            { bg: 'rgba(239,35,60,0.3)',    border: '#ef233c' },
+    'Phishing':           { bg: 'rgba(244,162,97,0.3)',   border: '#f4a261' },
+    'Vulnerability':      { bg: 'rgba(157,78,221,0.3)',   border: '#9d4edd' },
+    'Data Breach':        { bg: 'rgba(0,180,216,0.3)',    border: '#00b4d8' },
+    'APT / Nation State': { bg: 'rgba(239,35,60,0.4)',    border: '#ff4d6d' },
+    'General':            { bg: 'rgba(112,144,174,0.3)',  border: '#7090ae' },
+  };
+  const DEFAULT_COLOR = { bg: 'rgba(112,144,174,0.3)', border: '#7090ae' };
+
   function renderCharts(stats) {
     const cats = stats.category_distribution || {};
     // Sort categories by count for a cleaner bar chart
     const sortedLabels = Object.keys(cats).sort((a, b) => cats[b] - cats[a]);
     const sortedData   = sortedLabels.map(l => cats[l]);
+
+    // Derive colors per label from the fixed map (no positional guessing)
+    const bgColors     = sortedLabels.map(l => (CATEGORY_COLORS[l] || DEFAULT_COLOR).bg);
+    const borderColors = sortedLabels.map(l => (CATEGORY_COLORS[l] || DEFAULT_COLOR).border);
 
     const catCanvas = document.getElementById('chartCategories');
     if (catCanvas) {
@@ -1146,17 +1279,8 @@
           datasets: [{
             label:           'Volume',
             data:            sortedData,
-            backgroundColor: [
-              'rgba(239,35,60,0.3)',  // Malware
-              'rgba(244,162,97,0.3)', // Phishing
-              'rgba(157,78,221,0.3)', // Vuln
-              'rgba(0,180,216,0.3)',  // Breach
-              'rgba(239,35,60,0.4)',  // APT
-              'rgba(112,144,174,0.3)' // General
-            ],
-            borderColor: [
-              '#ef233c','#f4a261','#9d4edd','#00b4d8','#ff4d6d','#7090ae'
-            ],
+            backgroundColor: bgColors,
+            borderColor:     borderColors,
             borderWidth:     1,
             borderRadius:    5,
           }]
@@ -1351,7 +1475,147 @@
     }
   }
 
-  // ── 10. AI Briefing ──────────────────────────────────────────────────────────
+  // ── 10. Domain Lookup ────────────────────────────────────────────────────────
+
+  async function lookupDomain() {
+    const input  = document.getElementById('domain-input');
+    const btn    = document.getElementById('domain-btn');
+    const domain = input.value.trim().replace(/^https?:\/\//i, '').split('/')[0];
+
+    if (!domain) return;
+
+    btn.disabled    = true;
+    btn.textContent = 'Checking...';
+    document.getElementById('domain-result').innerHTML =
+      '<div class="loader"><div class="spinner"></div> Querying VirusTotal...</div>';
+
+    try {
+      const res  = await fetch(`/api/ioc/domain/${encodeURIComponent(domain)}`);
+      const data = await res.json();
+
+      if (data.error) {
+        document.getElementById('domain-result').innerHTML =
+          `<div class="msg-card warn">⚠ ${data.error}</div>`;
+        return;
+      }
+
+      const verdict    = data.verdict || 'UNKNOWN';
+      const malicious  = data.malicious  || 0;
+      const total      = data.total_engines || 1;
+      const pct        = Math.round((malicious / total) * 100);
+      const repColor   = data.reputation < 0 ? 'var(--danger)' : data.reputation > 0 ? 'var(--success)' : 'var(--text-2)';
+      const cats       = (data.categories || []).join(', ') || 'None detected';
+      const created    = data.creation_date ? new Date(data.creation_date * 1000).toLocaleDateString() : 'Unknown';
+
+      document.getElementById('domain-result').innerHTML = `
+        <div class="ioc-result">
+          <div class="verdict-banner">
+            <div>
+              <div style="font-family:var(--font-mono);font-size:0.9rem;color:var(--text-1);">${domain}</div>
+              <div style="font-size:0.75rem;color:var(--text-3);margin-top:4px;">${data.registrar || 'Registrar unknown'}</div>
+            </div>
+            <div class="verdict-badge verdict-${verdict}">${verdict}</div>
+          </div>
+          <div class="ioc-fields">
+            <div class="ioc-field" style="grid-column:1/-1">
+              <div class="fk">Detection Rate (${malicious}/${total} engines)</div>
+              <div class="detection-bar" style="margin-top:6px;height:12px;">
+                <div class="detection-fill" style="width:${pct}%;background:${malicious>=3?'var(--danger)':malicious>=1?'var(--warning)':'var(--success)'}"></div>
+              </div>
+              <div style="font-size:0.72rem;color:var(--text-3);margin-top:4px;font-family:var(--font-mono);">
+                ${malicious} malicious · ${data.suspicious||0} suspicious · ${data.clean||0} clean
+              </div>
+            </div>
+            <div class="ioc-field">
+              <div class="fk">Reputation Score</div>
+              <div class="fv" style="color:${repColor};">${data.reputation ?? 'N/A'}</div>
+            </div>
+            <div class="ioc-field">
+              <div class="fk">Created</div>
+              <div class="fv" style="font-size:0.78rem;">${created}</div>
+            </div>
+            <div class="ioc-field" style="grid-column:1/-1">
+              <div class="fk">Categories</div>
+              <div class="fv" style="font-size:0.78rem;">${cats}</div>
+            </div>
+          </div>
+        </div>
+      `;
+    } catch (err) {
+      document.getElementById('domain-result').innerHTML =
+        `<div class="msg-card err">Request failed: ${err.message}</div>`;
+    } finally {
+      btn.disabled    = false;
+      btn.textContent = 'Check Domain →';
+    }
+  }
+
+  // ── 11. URL Scan ─────────────────────────────────────────────────────────────
+
+  async function scanURL() {
+    const input = document.getElementById('url-input');
+    const btn   = document.getElementById('url-btn');
+    const url   = input.value.trim();
+
+    if (!url) return;
+
+    btn.disabled    = true;
+    btn.textContent = 'Scanning...';
+    document.getElementById('url-result').innerHTML =
+      '<div class="loader"><div class="spinner"></div> Submitting to VirusTotal — this may take up to 15 seconds...</div>';
+
+    try {
+      const res  = await fetch(`/api/ioc/url?url=${encodeURIComponent(url)}`);
+      const data = await res.json();
+
+      if (data.error) {
+        document.getElementById('url-result').innerHTML =
+          `<div class="msg-card warn">⚠ ${data.error}</div>`;
+        return;
+      }
+
+      if (data.verdict === 'PENDING') {
+        document.getElementById('url-result').innerHTML =
+          `<div class="msg-card warn">⏳ ${data.message}</div>`;
+        return;
+      }
+
+      const verdict   = data.verdict || 'UNKNOWN';
+      const malicious = data.malicious  || 0;
+      const total     = data.total_engines || 1;
+      const pct       = Math.round((malicious / total) * 100);
+
+      document.getElementById('url-result').innerHTML = `
+        <div class="ioc-result">
+          <div class="verdict-banner">
+            <div style="flex:1;min-width:0;">
+              <div style="font-family:var(--font-mono);font-size:0.78rem;color:var(--text-2);word-break:break-all;">${url}</div>
+            </div>
+            <div class="verdict-badge verdict-${verdict}" style="flex-shrink:0;margin-left:12px;">${verdict}</div>
+          </div>
+          <div class="ioc-fields">
+            <div class="ioc-field" style="grid-column:1/-1">
+              <div class="fk">Detection Rate (${malicious}/${total} engines)</div>
+              <div class="detection-bar" style="margin-top:6px;height:12px;">
+                <div class="detection-fill" style="width:${pct}%;background:${malicious>=3?'var(--danger)':malicious>=1?'var(--warning)':'var(--success)'}"></div>
+              </div>
+              <div style="font-size:0.72rem;color:var(--text-3);margin-top:4px;font-family:var(--font-mono);">
+                ${malicious} malicious · ${data.suspicious||0} suspicious · ${data.clean||0} clean
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+    } catch (err) {
+      document.getElementById('url-result').innerHTML =
+        `<div class="msg-card err">Request failed: ${err.message}</div>`;
+    } finally {
+      btn.disabled    = false;
+      btn.textContent = 'Scan URL →';
+    }
+  }
+
+  // ── 12. AI Briefing ──────────────────────────────────────────────────────────
 
   async function generateBriefing() {
     const btn    = document.getElementById('briefing-btn');
@@ -1496,7 +1760,7 @@
     });
   }
 
-  // ── 12. API Status Check ─────────────────────────────────────────────────────
+  // ── 13. API Status Check ─────────────────────────────────────────────────────
 
   async function checkStatus() {
     try {
@@ -1526,7 +1790,8 @@
   // because this script tag is at the bottom of the body).
 
   checkStatus();    // Show which API keys are configured
-  loadDashboard();  // Load stats + charts + latest articles
+  loadDashboard();  // Load stats + latest articles
+  loadMap();        // Init map directly on the dashboard
 
 </script>
 </body>
