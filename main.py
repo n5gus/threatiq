@@ -28,6 +28,7 @@
 
 import asyncio
 import os
+import random
 import json
 import time
 import re
@@ -205,37 +206,92 @@ async def serve_dashboard():
     return FileResponse("static/index.html")
 
 
+# =============================================================================
+# ── 6.5 GEOLOCATION MAPPING ──────────────────────────────────────────────────
+# Mapping of common threat actor origins and key security regions to centroids.
+# =============================================================================
+
+COUNTRY_GEO = {
+    "Russia":      [61.5, 105.3,  ["russia", "moscow", "kremlin", "fsb", "apt28", "apt29"]],
+    "China":       [35.8, 104.1,  ["china", "beijing", "chinese", "apt41", "volt typhoon"]],
+    "USA":         [37.0, -95.7,  ["usa", "united states", "america", "fbi", "nsa", "cisa"]],
+    "Iran":        [32.4,  53.6,   ["iran", "tehran", "charming kitten", "muddywater"]],
+    "North Korea": [40.3, 127.5,  ["north korea", "dprk", "pyongyang", "lazarus", "kimsuky"]],
+    "Israel":      [31.0, 34.8,   ["israel", "tel aviv", "mossad", "unit 8200"]],
+    "Ukraine":     [48.3, 31.1,   ["ukraine", "kyiv", "ukrainian"]],
+    "Brazil":      [-14.2, -51.9, ["brazil", "brasília", "são paulo"]],
+    "UK":          [55.3, -3.4,   ["uk", "united kingdom", "london", "gchq"]],
+    "Germany":     [51.1, 10.4,   ["germany", "berlin", "bundeswehr"]],
+    "France":      [46.2, 2.2,    ["france", "paris", "dgse"]],
+    "Canada":      [56.1, -106.3, ["canada", "ottawa"]],
+    "Australia":   [-25.2, 133.7, ["australia", "canberra", "sigint"]],
+    "India":       [20.5, 78.9,   ["india", "delhi", "mumbai"]],
+    "Japan":       [36.2, 138.2,  ["japan", "tokyo"]],
+    "South Korea": [35.9, 127.7,  ["south korea", "seoul"]],
+    "Taiwan":      [23.6, 120.9,  ["taiwan", "taipei"]],
+    "Turkey":      [38.9, 35.2,   ["turkey", "ankara", "istanbul"]],
+    "Belarus":     [53.7, 27.9,   ["belarus", "minsk"]],
+    "Poland":      [51.9, 19.1,   ["poland", "warsaw"]],
+    "Middle East": [25.0, 45.0,   ["middle east", "arabia"]],
+    "Europe":      [50.0, 10.0,   ["europe"]],
+}
+
+def get_jitter() -> float:
+    """Returns a random float between -0.6 and 0.6 to jitter overlapping markers."""
+    return (random.random() - 0.5) * 1.2
+
+
+async def _fetch_all_articles_internal() -> list:
+    """Internal helper to fetch all articles across all RSS feeds in parallel."""
+    loop = asyncio.get_event_loop()
+    tasks = [
+        loop.run_in_executor(None, _parse_feed_sync, source, url, 20)
+        for source, url in RSS_FEEDS.items()
+    ]
+    results = await asyncio.gather(*tasks, return_exceptions=True)
+    all_articles = []
+    for r in results:
+        if isinstance(r, list):
+            all_articles.extend(r)
+    # Sort all articles by timestamp descending
+    all_articles.sort(key=lambda x: x.get("timestamp", 0), reverse=True)
+    return all_articles
+
+
+@app.get("/api/news/map")
+async def get_map_data():
+    """
+    Scans recent news articles for country/region keywords.
+    Returns a list of geo-located markers for the dashboard map.
+    """
+    articles = await _fetch_all_articles_internal()
+    points = []
+
+    for art in articles[:50]: # Scan most recent 50
+        text = (art["title"] + " " + art["summary"]).lower()
+        for name, geo in COUNTRY_GEO.items():
+            lat, lng, keywords = geo
+            if name.lower() in text or any(k in text for k in keywords):
+                points.append({
+                    "lat": lat + get_jitter(),
+                    "lng": lng + get_jitter(),
+                    "title": art["title"],
+                    "url": art["link"],
+                    "source": art["source"],
+                    "country": name
+                })
+                break
+    return points
+
+
 # ── Route: GET /api/news ──────────────────────────────────────────────────────
 # Query params: category=all|Malware|Phishing|..., limit=30
 # Example: /api/news?category=Malware&limit=10
 
 @app.get("/api/news")
 async def get_news(category: str = "all", limit: int = 100):
-    """
-    Aggregate security news from all RSS feeds.
-    Fetches all feeds in parallel for speed (asyncio.gather).
-    """
-    loop = asyncio.get_event_loop()
-
-    # run_in_executor runs a blocking function in a thread pool without
-    # blocking the async event loop. This is the standard pattern for
-    # calling synchronous libraries (like feedparser) from async code.
-    tasks = [
-        loop.run_in_executor(None, _parse_feed_sync, source, url, 20)
-        for source, url in RSS_FEEDS.items()
-    ]
-
-    # asyncio.gather runs all tasks concurrently and waits for all to finish.
-    # If we called them sequentially, 6 feeds × ~1s each = 6s. Parallel = ~1s.
-    results = await asyncio.gather(*tasks, return_exceptions=True)
-
-    all_articles = []
-    for result in results:
-        if isinstance(result, list):   # Skip any feeds that threw exceptions
-            all_articles.extend(result)
-
-    # Sort all articles by timestamp descending (newest first)
-    all_articles.sort(key=lambda x: x.get("timestamp", 0), reverse=True)
+    """Aggregate security news with optional category filtering."""
+    all_articles = await _fetch_all_articles_internal()
 
     # Apply category filter if specified
     if category.lower() != "all":

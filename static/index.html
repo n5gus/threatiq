@@ -1224,11 +1224,8 @@
       // Store all articles for the feed page
       allArticles = articles;
 
-      // Render Chart.js charts (only once)
-      if (!chartsRendered) {
-        renderCharts(stats);
-        chartsRendered = true;
-      }
+      // Update map markers to match the latest feed data
+      updateMapMarkers();
 
     } catch (err) {
       console.error('Dashboard load error:', err);
@@ -1733,31 +1730,51 @@
       maxZoom: 20
     }).addTo(mapInstance);
 
-    // Mock live threat data
-    const threatPoints = [
-      { lat: 55.75, lng: 37.61, desc: 'Brute Force Campaign (RU)' },
-      { lat: 39.90, lng: 116.40, desc: 'APT Data Exfiltration (CN)' },
-      { lat: 40.71, lng: -74.00, desc: 'Active C2 Infrastructure (US)' },
-      { lat: 51.50, lng: -0.12, desc: 'DDoS Amplification Node (UK)' },
-      { lat: -23.55, lng: -46.63, desc: 'Phishing hosting (BR)' },
-      { lat: 35.68, lng: 139.69, desc: 'Malware Distributor (JP)' },
-      { lat: -33.86, lng: 151.20, desc: 'Ransomware Gateway (AU)' },
-      { lat: 1.35, lng: 103.81, desc: 'IoT Botnet Cluster (SG)' },
-      { lat: 48.85, lng: 2.35, desc: 'Credential Stuffing Node (FR)' },
-      { lat: 52.52, lng: 13.40, desc: 'Tor Exit Node (DE)' }
-    ];
+    // Fetch feed-driven threat locations from the backend
+    updateMapMarkers();
+  }
 
-    const dangerIcon = L.divIcon({
-      className: 'threat-icon',
-      html: '<div style="background:var(--danger);width:12px;height:12px;border-radius:50%;box-shadow:0 0 10px var(--danger);"></div>',
-      iconSize: [12, 12]
-    });
+  let mapMarkersLayer = L.layerGroup();
 
-    threatPoints.forEach(pt => {
-      L.marker([pt.lat, pt.lng], { icon: dangerIcon })
-        .bindPopup(`<div style="font-family:var(--font-mono);font-size:0.8rem;"><strong>THREAT DETECTED</strong><br>${pt.desc}</div>`)
-        .addTo(mapInstance);
-    });
+  async function updateMapMarkers() {
+    if (!mapInstance) return;
+    
+    try {
+      const res  = await fetch('/api/news/map');
+      const data = await res.json();
+      
+      mapMarkersLayer.clearLayers();
+      mapMarkersLayer.addTo(mapInstance);
+
+      const dangerIcon = L.divIcon({
+        className: 'threat-icon',
+        html: '<div style="background:var(--danger);width:10px;height:10px;border-radius:50%;box-shadow:0 0 10px var(--danger);"></div>',
+        iconSize: [10, 10]
+      });
+
+      data.forEach(pt => {
+        const popupContent = `
+          <div style="font-family:var(--font-sans);min-width:160px;">
+            <div style="color:var(--text-3);font-size:0.65rem;text-transform:uppercase;margin-bottom:4px;font-family:var(--font-mono);">
+              Threat Detected: ${pt.country}
+            </div>
+            <div style="color:var(--text-1);font-weight:600;font-size:0.85rem;line-height:1.2;margin-bottom:8px;">
+              ${pt.title}
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;padding-top:8px;border-top:1px solid var(--border);">
+              <span style="font-size:0.7rem;color:var(--text-3);">${pt.source}</span>
+              <a href="${pt.url}" target="_blank" style="color:var(--accent);text-decoration:none;font-size:0.7rem;font-weight:600;">READ MORE →</a>
+            </div>
+          </div>
+        `;
+
+        L.marker([pt.lat, pt.lng], { icon: dangerIcon })
+          .bindPopup(popupContent)
+          .addTo(mapMarkersLayer);
+      });
+    } catch (err) {
+      console.error('Failed to update map markers:', err);
+    }
   }
 
   // ── 13. API Status Check ─────────────────────────────────────────────────────
