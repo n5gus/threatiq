@@ -13,6 +13,8 @@ APIs, AlienVault OTX pulses, and an AI-generated daily briefing into a single da
 | Feature | Data Source | Free? |
 |---|---|---|
 | **Threat Feed** | 6 RSS sources (Krebs, BleepingComputer, SANS, THN, etc.) | No key needed |
+| **Scrolling Ticker** | Latest threat headlines in stock-ticker format | No key needed |
+| **SANS Stormcast** | Embedded Daily YouTube Podcast | Free/Public |
 | **Charts** | Derived from RSS (category + source distribution) | No key needed |
 | **IP Reputation** | AbuseIPDB | 1,000/day free |
 | **File Hash Lookup** | VirusTotal (70+ AV engines) | 500/day free |
