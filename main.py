@@ -804,6 +804,129 @@ async def get_briefing(refresh: bool = False):
         return error_result
 
 
+# ── Route: GET /api/tweetfeed ─────────────────────────────────────────────────
+# TweetFeed.live — Free real-time IOCs from security researchers on X/Twitter.
+# No API key required. Data is scraped from X by the TweetFeed project and
+# served via a free REST API. Updated every 15 minutes.
+# API docs: https://tweetfeed.live/api/
+# Endpoint: GET https://api.tweetfeed.live/v1/{time}/{filter1}/{filter2}
+
+TWEETFEED_CACHE_FILE      = "tweetfeed_cache.json"
+TWEETFEED_CACHE_EXPIRY    = 600  # 10 minutes
+
+@app.get("/api/tweetfeed")
+async def get_tweetfeed(
+    period: str = "today",
+    ioc_type: str = "",
+    tag: str = "",
+    refresh: bool = False
+):
+    """
+    Fetch IOCs shared by security researchers on X/Twitter via TweetFeed.live.
+    
+    Parameters:
+    - period: today, week, month, year
+    - ioc_type: ip, url, domain, sha256, md5 (optional)
+    - tag: phishing, malware, cobalt strike, etc. (optional)
+    - refresh: force cache refresh
+    
+    No API key required — fully free and open.
+    """
+
+    # Build cache key from parameters
+    cache_key = f"{period}_{ioc_type}_{tag}"
+
+    # 1. Check cache
+    if not refresh and os.path.exists(TWEETFEED_CACHE_FILE):
+        try:
+            with open(TWEETFEED_CACHE_FILE, "r") as f:
+                cache_data = json.load(f)
+
+            cached_entry = cache_data.get(cache_key)
+            if cached_entry:
+                cache_time = cached_entry.get("fetched_at_unix", 0)
+                if (time.time() - cache_time) < TWEETFEED_CACHE_EXPIRY:
+                    return cached_entry
+        except Exception:
+            pass
+
+    # 2. Build API URL
+    # Format: GET https://api.tweetfeed.live/v1/{time}/{filter1}/{filter2}
+    url_parts = [f"https://api.tweetfeed.live/v1/{period}"]
+    if tag:
+        url_parts.append(tag)
+    if ioc_type:
+        url_parts.append(ioc_type)
+    api_url = "/".join(url_parts)
+
+    async with httpx.AsyncClient() as client:
+        try:
+            response = await client.get(api_url, timeout=15.0)
+
+            if response.status_code != 200:
+                raise HTTPException(
+                    status_code=response.status_code,
+                    detail=f"TweetFeed API returned {response.status_code}"
+                )
+
+            raw_iocs = response.json()
+
+            # 3. Process and summarize the data
+            iocs = []
+            type_counts = defaultdict(int)
+            tag_counts  = defaultdict(int)
+
+            for item in raw_iocs[:200]:  # Limit to 200 most recent
+                ioc_entry = {
+                    "date":   item.get("date", ""),
+                    "user":   item.get("user", ""),
+                    "type":   item.get("type", ""),
+                    "value":  item.get("value", ""),
+                    "tags":   item.get("tags", []),
+                    "tweet":  item.get("tweet", ""),
+                }
+                iocs.append(ioc_entry)
+                type_counts[ioc_entry["type"]] += 1
+                for t in ioc_entry["tags"]:
+                    tag_counts[t.strip("#").lower()] += 1
+
+            # Sort tags by frequency
+            top_tags = sorted(tag_counts.items(), key=lambda x: x[1], reverse=True)[:15]
+
+            result = {
+                "configured": True,
+                "period":     period,
+                "ioc_type":   ioc_type or "all",
+                "tag_filter": tag or "none",
+                "total":      len(raw_iocs),
+                "showing":    len(iocs),
+                "iocs":       iocs,
+                "type_breakdown": dict(type_counts),
+                "top_tags":       [{"tag": t[0], "count": t[1]} for t in top_tags],
+                "fetched_at":     datetime.now(timezone.utc).isoformat(),
+                "fetched_at_unix": time.time(),
+            }
+
+            # 4. Save to cache
+            try:
+                cache_data = {}
+                if os.path.exists(TWEETFEED_CACHE_FILE):
+                    with open(TWEETFEED_CACHE_FILE, "r") as f:
+                        cache_data = json.load(f)
+                cache_data[cache_key] = result
+                with open(TWEETFEED_CACHE_FILE, "w") as f:
+                    json.dump(cache_data, f, indent=2)
+            except Exception:
+                pass
+
+            return result
+
+        except httpx.TimeoutException:
+            raise HTTPException(status_code=504, detail="TweetFeed API request timed out")
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+
 # ── Route: GET /api/status ────────────────────────────────────────────────────
 # Health check — tells the frontend which API keys are configured.
 # Used by the dashboard to show the "API Status" panel in the sidebar.
@@ -816,6 +939,7 @@ async def get_status():
         "abuseipdb":   not is_placeholder_key(ABUSEIPDB_KEY),
         "virustotal":  not is_placeholder_key(VIRUSTOTAL_KEY),
         "otx":         not is_placeholder_key(OTX_KEY),
+        "tweetfeed":   True,  # Always available — no key needed
         "rss_feeds":   len(RSS_FEEDS),
         "server_time": datetime.now(timezone.utc).isoformat(),
     }

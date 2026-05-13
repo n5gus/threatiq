@@ -1,1738 +1,967 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="dark">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ThreatIQ — Threat Intelligence Platform</title>
+  <title>ThreatIQ â€” Threat Intelligence Platform</title>
+  <meta name="description" content="Real-time threat intelligence dashboard aggregating security feeds, IOC lookups, and AI-powered briefings.">
 
-  <!--
-    WHAT IS THIS FILE?
-    This is a Single-Page Application (SPA) — one HTML file that renders
-    multiple "pages" by showing/hiding sections via JavaScript.
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            base: '#0a0e1a',
+            'base-light': '#111827',
+            surface: '#151b2e',
+            card: '#1a1f2e',
+            accent: '#38bdf8',
+            'accent-dim': '#0ea5e9',
+            'tlp-red': '#FF4C4C',
+            'tlp-amber': '#FFB74D',
+            'tlp-green': '#81C784',
+          },
+          fontFamily: {
+            mono: ['IBM Plex Mono', 'monospace'],
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+          },
+        }
+      }
+    }
+  </script>
 
-    STRUCTURE:
-    1. <head>  — fonts, styles (CSS)
-    2. <body>  — sidebar + main content area (HTML)
-    3. <script>— all interactivity (JavaScript at the bottom)
-
-    WHY EVERYTHING IN ONE FILE?
-    For a hackathon demo, a single file is fast to iterate on and easy
-    to share. No build step, no bundler, no npm install for the frontend.
-
-    FONTS: IBM Plex Mono (code/headings) + IBM Plex Sans (body)
-    CHARTS: Chart.js loaded from CDN (cdnjs.cloudflare.com)
-  -->
-
+  <!-- Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@300;400;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- Leaflet Map -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <!-- Chart.js -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
 
   <style>
-    /* ============================================================
-       CSS CUSTOM PROPERTIES (Variables)
-       Defining colors here means we can change the whole theme
-       by editing just this section.
-    ============================================================ */
-    :root {
-      --bg-base:       #0f172a;   /* slightly lighter navy background */
-      --bg-surface:    #1e293b;   /* sidebar, cards */
-      --bg-card:       #1e293b;   /* content cards */
-      --bg-input:      #334155;   /* form inputs */
-      --accent:        #38bdf8;   /* brighter cyan */
-      --accent-dim:    #0ea5e9;   /* slightly darker cyan */
-      --success:       #10b981;   /* green for clean/low */
-      --warning:       #f59e0b;   /* amber for suspicious/medium */
-      --danger:        #ef4444;   /* red for malicious/critical */
-      --purple:        #8b5cf6;   /* purple for APT */
-      --text-1:        #f8fafc;   /* brighter primary text */
-      --text-2:        #cbd5e1;   /* secondary text */
-      --text-3:        #94a3b8;   /* muted text */
-      --border:        #334155;   /* card borders */
-      --border-hover:  #475569;   /* hover state borders */
-      --font-mono:     'IBM Plex Mono', monospace;
-      --font-sans:     'IBM Plex Sans', sans-serif;
+    /* Glassmorphism */
+    .glass {
+      background: rgba(21, 27, 46, 0.6);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+    .glass-strong {
+      background: rgba(21, 27, 46, 0.85);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255,255,255,0.1);
     }
 
-    /* ── Reset & Base ─────────────────────────────────────────── */
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-    html, body {
-      height: 100%;
-      background: var(--bg-base);
-      color: var(--text-1);
-      font-family: var(--font-sans);
-      font-size: 18px; /* Increased base font size from 16px */
-      line-height: 1.6;
-    }
-
-    /* Scrollbar styling — thin, dark, cyber look */
+    /* Scrollbar */
     ::-webkit-scrollbar { width: 4px; height: 4px; }
-    ::-webkit-scrollbar-track { background: var(--bg-base); }
-    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 2px; }
 
-    /* ── Layout ────────────────────────────────────────────────── */
-    /* CSS Grid: sidebar fixed at 220px, main area takes remaining space */
-    .layout {
+    /* Animations */
+    @keyframes ticker-scroll { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
+    @keyframes pulse-glow { 0%,100% { opacity:1; } 50% { opacity:0.3; } }
+    @keyframes slide-right { from { transform: translateX(100%); } to { transform: translateX(0); } }
+    @keyframes fade-up { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+    @keyframes scan { 0% { top:0; } 100% { top:100%; } }
+
+    .anim-ticker { animation: ticker-scroll 200s linear infinite; }
+    .anim-ticker:hover { animation-play-state: paused; }
+    .anim-pulse { animation: pulse-glow 2s ease-in-out infinite; }
+    .anim-fade { animation: fade-up 0.3s ease-out; }
+
+    /* Bento Grid */
+    .bento {
       display: grid;
-      grid-template-columns: 220px 1fr;
-      grid-template-rows: 100vh;
-      height: 100vh;
-      overflow: hidden;
-      transition: grid-template-columns 0.25s ease;
-    }
-    .layout.sidebar-collapsed {
-      grid-template-columns: 0px 1fr;
-    }
-
-    /* ── Sidebar ───────────────────────────────────────────────── */
-    .sidebar {
-      background: var(--bg-surface);
-      border-right: 1px solid var(--border);
-      display: flex;
-      flex-direction: column;
-      padding: 20px 0;
-      overflow: hidden;         /* hide text when collapsing */
-      transition: width 0.25s ease;
-      position: relative;
-      white-space: nowrap;
-    }
-
-    /* ── Sidebar toggle button (moved to main area top bar) ────── */
-    .sidebar-toggle {
-      width: 32px; height: 32px;
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      background: var(--bg-input);
-      color: var(--text-2);
-      font-size: 16px;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      transition: all 0.15s;
-      flex-shrink: 0;
-    }
-    .sidebar-toggle:hover { background: var(--bg-card); color: var(--accent); border-color: var(--accent); }
-
-    /* ── Top bar ───────────────────────────────────────────────── */
-    .top-bar {
-      display: flex;
-      align-items: center;
-      justify-content: flex-start;
-      gap: 16px;
-      padding: 12px 24px;
-      background: var(--bg-base);
-      border-bottom: 1px solid var(--border);
-      z-index: 50;
-    }
-    .top-bar .logo-wrap {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-    .top-bar .logo-name {
-      font-family: var(--font-mono);
-      font-size: 1.2rem;
-      font-weight: 600;
-      color: var(--accent);
-      letter-spacing: -0.5px;
-    }
-    .top-bar .logo-tagline {
-      font-size: 0.7rem;
-      color: var(--text-3);
-      margin-top: 1px;
-    }
-
-    .sidebar-logo {
-      padding: 0 20px 20px;
-      border-bottom: 1px solid var(--border);
-    }
-
-    .sidebar-logo .name {
-      font-family: var(--font-mono);
-      font-size: 1.54rem;
-      font-weight: 600;
-      color: var(--accent);
-      letter-spacing: -0.5px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-    }
-
-    .sidebar-logo .tagline {
-      font-size: 0.72rem;
-      color: var(--text-2);
-      margin-top: 2px;
-      transition: opacity 0.2s;
-    }
-
-    .sidebar-logo .logo-text {
-      transition: opacity 0.2s;
-    }
-
-    .nav-section {
-      padding: 16px 12px 0;
-    }
-
-    .nav-label {
-      font-size: 0.65rem;
-      color: var(--text-3);
-      text-transform: uppercase;
-      letter-spacing: 0.1em;
-      padding: 0 8px 6px;
-      font-family: var(--font-mono);
-    }
-
-    /* Navigation button */
-    .nav-btn {
-      display: flex;
-      align-items: center;
+      grid-template-columns: 1fr 1fr 1fr 1fr;
+      grid-template-rows: 40px 80px 1fr 1fr 1fr;
       gap: 10px;
-      width: 100%;
-      padding: 9px 10px;
-      border: none;
-      border-radius: 6px;
-      background: transparent;
-      color: var(--text-2);
-      font-family: var(--font-sans);
-      font-size: 1rem; /* Increased from 0.85rem */
-      cursor: pointer;
-      text-align: left;
-      transition: all 0.15s;
-      margin-bottom: 2px;
-    }
-
-    .nav-btn:hover { background: var(--bg-card); color: var(--text-1); }
-
-    .nav-btn-text, .nav-label {
-      transition: opacity 0.2s;
-    }
-
-    /* Active nav button — highlighted with accent border */
-    .nav-btn.active {
-      background: rgba(0, 180, 216, 0.12);
-      color: var(--accent);
-      border-left: 2px solid var(--accent);
-      padding-left: 8px;
-    }
-
-    .nav-icon { font-size: 14px; width: 16px; text-align: center; }
-
-    /* API status indicators at the bottom of sidebar */
-    .api-status {
-      margin-top: auto;
-      padding: 16px 20px;
-      border-top: 1px solid var(--border);
-      font-size: 0.75rem;
-    }
-
-    .api-status-title {
-      color: var(--text-3);
-      font-family: var(--font-mono);
-      font-size: 0.65rem;
-      text-transform: uppercase;
-      letter-spacing: 0.1em;
-      margin-bottom: 8px;
-    }
-
-    .api-row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 3px 0;
-    }
-
-    .api-row span { color: var(--text-2); }
-
-    /* Status dot — green if configured, red if not */
-    .dot {
-      width: 7px; height: 7px;
-      border-radius: 50%;
-      background: var(--danger);
-    }
-    .dot.ok { background: var(--success); }
-
-    /* ── Main Content Area ─────────────────────────────────────── */
-    .main {
-      overflow-y: auto;
-      padding: 24px;
-      background: var(--bg-base);
-    }
-
-    /* ── Page Sections (show/hide via JS) ─────────────────────── */
-    /* Each .page-section is a "page" — only one is visible at a time */
-    .page-section { display: none; }
-    .page-section.active { display: block; }
-
-    /* ── Page Header ───────────────────────────────────────────── */
-    .page-header {
-      margin-bottom: 24px;
-    }
-
-    .page-title {
-      font-family: var(--font-mono);
-      font-size: 1.6rem; /* Increased from 1.3rem */
-      font-weight: 600;
-      color: var(--text-1);
-    }
-
-    .page-subtitle {
-      color: var(--text-2);
-      font-size: 0.82rem;
-      margin-top: 4px;
-    }
-
-    /* Live indicator (blinking dot) */
-    .live-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 5px;
-      background: rgba(6, 214, 160, 0.1);
-      border: 1px solid rgba(6, 214, 160, 0.3);
-      border-radius: 20px;
-      padding: 2px 8px;
-      font-size: 0.7rem;
-      color: var(--success);
-      font-family: var(--font-mono);
-    }
-
-    .live-dot {
-      width: 6px; height: 6px;
-      border-radius: 50%;
-      background: var(--success);
-      animation: pulse 2s infinite;
-    }
-
-    @keyframes pulse {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.3; }
-    }
-
-    /* ── Stats Cards Row ───────────────────────────────────────── */
-    /* ── Stock Ticker ───────────────────────────────────────────── */
-    .ticker-wrap {
-      width: 100%;
-      overflow: hidden;
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 12px 0;
-      margin-bottom: 24px;
-      white-space: nowrap;
-    }
-    .ticker-move {
-      display: inline-block;
-      white-space: nowrap;
-      padding-left: 100%;
-      animation: ticker 360s linear infinite;
-    }
-    .ticker-move:hover {
-      animation-play-state: paused;
-    }
-    @keyframes ticker {
-      0%   { transform: translateX(0); }
-      100% { transform: translateX(-100%); }
-    }
-    .ticker-item {
-      display: inline-block;
-      padding: 0 2rem;
-      font-family: var(--font-mono);
-      font-size: 0.85rem;
-      color: var(--text-2);
-    }
-    .ticker-item span {
-      color: var(--accent);
-      font-weight: 600;
-      margin-right: 8px;
-    }
-    .ticker-item a {
-      color: inherit;
-      text-decoration: none;
-    }
-    .ticker-item a:hover {
-      color: var(--text-1);
-      text-decoration: underline;
-    }
-
-    /* ── Charts Grid ───────────────────────────────────────────── */
-    .charts-grid {
-      display: grid;
-      grid-template-columns: 1fr;
-      gap: 14px;
-      margin-bottom: 24px;
-    }
-
-    .chart-card {
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 18px;
-    }
-
-    .chart-title {
-      font-family: var(--font-mono);
-      font-size: 0.82rem;
-      color: var(--text-2);
-      margin-bottom: 14px;
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
-    }
-
-    .chart-wrap {
-      position: relative;
-      height: 320px;
-    }
-
-    /* ── Article Cards ─────────────────────────────────────────── */
-    .articles-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 12px;
-    }
-
-    .article-card {
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 16px;
-      transition: border-color 0.2s, transform 0.15s;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-
-    .article-card:hover {
-      border-color: var(--border-hover);
-      transform: translateY(-1px);
-    }
-
-    .article-meta {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      flex-wrap: wrap;
-    }
-
-    .badge {
-      font-size: 0.65rem;
-      font-family: var(--font-mono);
-      padding: 2px 7px;
-      border-radius: 3px;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-    }
-
-    /* Category badge colors */
-    .badge-malware      { background: rgba(239,35,60,0.15);  color: #ff6b6b; }
-    .badge-phishing     { background: rgba(244,162,97,0.15); color: #f4a261; }
-    .badge-vulnerability{ background: rgba(157,78,221,0.15); color: #c77dff; }
-    .badge-data-breach  { background: rgba(0,180,216,0.15);  color: #00b4d8; }
-    .badge-apt          { background: rgba(239,35,60,0.2);   color: #ff4d6d; }
-    .badge-general      { background: rgba(112,144,174,0.15);color: #7090ae; }
-    .badge-source       { background: rgba(0,180,216,0.1);   color: var(--accent-dim); }
-
-    /* Source favicon next to the badge */
-    .source-favicon {
-      width: 14px;
-      height: 14px;
-      border-radius: 3px;
-      object-fit: contain;
-      vertical-align: middle;
-      flex-shrink: 0;
-    }
-
-    .article-title {
-      font-size: 1.1rem; /* Increased from 0.88rem */
-      font-weight: 600;
-      color: var(--text-1);
-      line-height: 1.4;
-    }
-
-    .article-title a {
-      color: inherit;
-      text-decoration: none;
-      transition: color 0.15s;
-    }
-
-    .article-title a:hover { color: var(--accent); }
-
-    .article-summary {
-      font-size: 0.95rem; /* Increased from 0.78rem */
-      color: var(--text-2);
-      line-height: 1.5;
-      display: -webkit-box;
-      -webkit-line-clamp: 3;         /* Show max 3 lines, then "..." */
-      line-clamp: 3;                 /* Standard property for compatibility */
-      -webkit-box-orient: vertical;
+      height: calc(100vh - 52px);
+      padding: 10px;
       overflow: hidden;
     }
+    .bento-ticker { grid-column: 1 / -1; }
+    .bento-kpi { }
+    .bento-map { grid-column: 1 / 3; overflow: hidden; }
+    .bento-feed { grid-column: 3 / 5; overflow: hidden; }
+    .bento-briefing { grid-column: 1 / 3; overflow: hidden; }
+    .bento-otx { grid-column: 3 / 5; overflow: hidden; }
+    .bento-tweetfeed { grid-column: 1 / -1; overflow: hidden; }
 
-    .article-date {
-      font-size: 0.7rem;
-      color: var(--text-3);
-      font-family: var(--font-mono);
-      margin-top: auto;
+    .bento-card {
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .bento-card:hover {
+      border-color: rgba(56,189,248,0.2);
+      box-shadow: 0 0 24px rgba(56,189,248,0.04);
     }
 
-    /* ── Category Filter Buttons ───────────────────────────────── */
-    .filter-bar {
-      display: flex;
-      gap: 8px;
-      flex-wrap: wrap;
-      margin-bottom: 20px;
-    }
+    /* IOC Side Drawer */
+    .drawer-bg { position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:90; opacity:0; pointer-events:none; transition:opacity 0.3s; }
+    .drawer-bg.open { opacity:1; pointer-events:auto; }
+    .drawer { position:fixed; top:0; right:0; bottom:0; width:480px; z-index:100; transform:translateX(100%); transition:transform 0.3s ease-out; overflow-y:auto; }
+    .drawer.open { transform:translateX(0); }
 
-    .filter-btn {
-      padding: 5px 12px;
-      border: 1px solid var(--border);
-      border-radius: 20px;
-      background: transparent;
-      color: var(--text-2);
-      font-size: 0.78rem;
-      cursor: pointer;
-      transition: all 0.15s;
-      font-family: var(--font-sans);
-    }
+    /* Command Palette */
+    .cmd-bg { position:fixed; inset:0; background:rgba(0,0,0,0.6); backdrop-filter:blur(4px); z-index:200; display:none; align-items:flex-start; justify-content:center; padding-top:18vh; }
+    .cmd-bg.open { display:flex; }
 
-    .filter-btn:hover { border-color: var(--accent-dim); color: var(--text-1); }
-    .filter-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+    /* Leaflet */
+    .leaflet-container { background: #0a0e1a !important; }
+    .leaflet-control-attribution { background:transparent !important; font-size:0.5rem !important; opacity:0.15; }
+    .leaflet-control-attribution a { color:#94a3b8 !important; }
+    .leaflet-control-zoom a { background:rgba(21,27,46,0.8) !important; color:#94a3b8 !important; border-color:rgba(255,255,255,0.1) !important; }
 
-    /* ── IOC Lookup ────────────────────────────────────────────── */
-    .ioc-tabs {
-      display: flex;
-      gap: 0;
-      margin-bottom: 20px;
-      border-bottom: 1px solid var(--border);
-    }
+    /* Threat dot on map */
+    .map-dot { width:10px; height:10px; border-radius:50%; background:#FF4C4C; box-shadow:0 0 8px #FF4C4C; }
 
-    .ioc-tab {
-      padding: 8px 20px;
-      border: none;
-      background: transparent;
-      color: var(--text-2);
-      font-size: 0.85rem;
-      cursor: pointer;
-      border-bottom: 2px solid transparent;
-      transition: all 0.15s;
-      font-family: var(--font-sans);
-    }
+    /* Detection bar */
+    .det-bar { height:6px; background:rgba(255,255,255,0.06); border-radius:3px; overflow:hidden; }
+    .det-fill { height:100%; border-radius:3px; transition:width 0.5s ease; }
 
-    .ioc-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
-    .ioc-tab:hover { color: var(--text-1); }
+    /* Verdict badges */
+    .v-mal { background:rgba(255,76,76,0.15); color:#FF6B6B; border:1px solid rgba(255,76,76,0.3); }
+    .v-sus { background:rgba(255,183,77,0.15); color:#FFB74D; border:1px solid rgba(255,183,77,0.3); }
+    .v-clean { background:rgba(129,199,132,0.15); color:#81C784; border:1px solid rgba(129,199,132,0.3); }
+    .v-unknown { background:rgba(148,163,184,0.1); color:#94a3b8; border:1px solid rgba(148,163,184,0.2); }
 
-    .ioc-panel { display: none; }
-    .ioc-panel.active { display: block; }
+    /* Active tab indicator */
+    .dtab.active { color:#38bdf8; border-bottom-color:#38bdf8; }
 
-    /* Input + Button row */
-    .input-row {
-      display: flex;
-      gap: 10px;
-      margin-bottom: 20px;
-    }
-
-    .ioc-input {
-      flex: 1;
-      background: var(--bg-input);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      color: var(--text-1);
-      font-family: var(--font-mono);
-      font-size: 0.85rem;
-      padding: 10px 14px;
-      transition: border-color 0.15s;
-      outline: none;
-    }
-
-    .ioc-input::placeholder { color: var(--text-3); }
-    .ioc-input:focus { border-color: var(--accent-dim); }
-
-    .lookup-btn {
-      padding: 10px 20px;
-      background: var(--accent-dim);
-      border: 1px solid var(--accent);
-      border-radius: 8px;
-      color: #fff;
-      font-size: 0.85rem;
-      font-family: var(--font-mono);
-      cursor: pointer;
-      transition: background 0.15s;
-      white-space: nowrap;
-    }
-
-    .lookup-btn:hover { background: var(--accent); }
-    .lookup-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-
-    /* IOC Result Card */
-    .ioc-result {
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 20px;
-    }
-
-    .verdict-banner {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 16px;
-      padding-bottom: 16px;
-      border-bottom: 1px solid var(--border);
-    }
-
-    .verdict-badge {
-      font-family: var(--font-mono);
-      font-size: 1rem;
-      font-weight: 600;
-      padding: 6px 16px;
-      border-radius: 6px;
-    }
-
-    .verdict-MALICIOUS  { background: rgba(239,35,60,0.2);  color: #ff4d6d; border: 1px solid #ef233c; }
-    .verdict-SUSPICIOUS { background: rgba(244,162,97,0.2); color: #f4a261; border: 1px solid #f4a261; }
-    .verdict-CLEAN      { background: rgba(6,214,160,0.2);  color: #06d6a0; border: 1px solid #06d6a0; }
-    .verdict-NOT\ FOUND { background: rgba(112,144,174,0.15); color: #7090ae; border: 1px solid #3a5570; }
-
-    .ioc-fields {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 10px;
-    }
-
-    .ioc-field {
-      background: var(--bg-input);
-      border-radius: 6px;
-      padding: 10px 12px;
-    }
-
-    .ioc-field .fk {
-      font-size: 0.68rem;
-      color: var(--text-3);
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      font-family: var(--font-mono);
-    }
-
-    .ioc-field .fv {
-      font-size: 0.88rem;
-      color: var(--text-1);
-      font-family: var(--font-mono);
-      margin-top: 2px;
-    }
-
-    /* Engine gauge for VirusTotal detections */
-    .detection-bar {
-      height: 8px;
-      background: var(--bg-input);
-      border-radius: 4px;
-      overflow: hidden;
-      margin-top: 4px;
-    }
-
-    .detection-fill {
-      height: 100%;
-      border-radius: 4px;
-      background: var(--danger);
-      transition: width 0.5s ease;
-    }
-
-    /* ── AI Briefing ───────────────────────────────────────────── */
-    .generate-btn {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 10px 24px;
-      background: linear-gradient(135deg, var(--accent-dim), #0055a0);
-      border: 1px solid var(--accent);
-      border-radius: 8px;
-      color: #fff;
-      font-size: 0.88rem;
-      font-family: var(--font-mono);
-      cursor: pointer;
-      transition: opacity 0.2s;
-      margin-bottom: 20px;
-    }
-
-    .generate-btn:hover { opacity: 0.85; }
-    .generate-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-
-    .briefing-card {
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 24px;
-    }
-
-    .briefing-text {
-      font-family: var(--font-mono);
-      font-size: 1rem; /* Increased from 0.82rem */
-      color: var(--text-1);
-      line-height: 1.8;
-      white-space: pre-wrap;   /* Preserve newlines from the API response */
-    }
-
-    /* Color-coded briefing sections */
-    .briefing-text .section-head {
-      color: var(--accent);
-      font-weight: 600;
-    }
-
-    .briefing-meta {
-      font-size: 0.72rem;
-      color: var(--text-3);
-      font-family: var(--font-mono);
-      margin-top: 16px;
-      padding-top: 12px;
-      border-top: 1px solid var(--border);
-    }
-
-    /* ── OTX Pulses ────────────────────────────────────────────── */
-    .pulses-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 12px;
-    }
-
-    .pulse-card {
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 16px;
-      transition: border-color 0.2s;
-    }
-
-    .pulse-card:hover { border-color: var(--border-hover); }
-
-    .pulse-header {
-      display: flex;
-      align-items: flex-start;
-      justify-content: space-between;
-      gap: 8px;
-      margin-bottom: 8px;
-    }
-
-    .pulse-name {
-      font-size: 0.88rem;
-      font-weight: 600;
-      color: var(--text-1);
-      line-height: 1.3;
-    }
-
-    .tlp-badge {
-      font-size: 0.62rem;
-      font-family: var(--font-mono);
-      padding: 2px 6px;
-      border-radius: 3px;
-      font-weight: 600;
-      white-space: nowrap;
-      flex-shrink: 0;
-    }
-
-    .tlp-white  { background: rgba(255,255,255,0.1); color: #aaa; }
-    .tlp-green  { background: rgba(6,214,160,0.15);  color: #06d6a0; }
-    .tlp-amber  { background: rgba(244,162,97,0.15); color: #f4a261; }
-    .tlp-red    { background: rgba(239,35,60,0.15);  color: #ef233c; }
-
-    .pulse-desc {
-      font-size: 0.78rem;
-      color: var(--text-2);
-      margin-bottom: 10px;
-      line-height: 1.5;
-      display: -webkit-box;
-      -webkit-line-clamp: 2;
-      line-clamp: 2;
-      -webkit-box-orient: vertical;
-      overflow: hidden;
-    }
-
-    .pulse-tags {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 4px;
-      margin-bottom: 10px;
-    }
-
-    .tag {
-      font-size: 0.65rem;
-      padding: 2px 6px;
-      background: rgba(0,180,216,0.1);
-      border: 1px solid rgba(0,180,216,0.2);
-      color: var(--accent-dim);
-      border-radius: 3px;
-      font-family: var(--font-mono);
-    }
-
-    .pulse-footer {
-      font-size: 0.7rem;
-      color: var(--text-3);
-      font-family: var(--font-mono);
-      display: flex;
-      justify-content: space-between;
-    }
-
-    /* ── Loader / Spinner ──────────────────────────────────────── */
-    .loader {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      padding: 40px;
-      color: var(--text-2);
-      font-family: var(--font-mono);
-      font-size: 0.82rem;
-    }
-
-    .spinner {
-      width: 18px; height: 18px;
-      border: 2px solid var(--border);
-      border-top-color: var(--accent);
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-    }
-
-    @keyframes spin { to { transform: rotate(360deg); } }
-
-    /* ── Error / Warning messages ──────────────────────────────── */
-    .msg-card {
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 20px 24px;
-      font-family: var(--font-mono);
-      font-size: 0.82rem;
-    }
-
-    .msg-card.warn {
-      border-color: rgba(244,162,97,0.4);
-      color: var(--warning);
-    }
-
-    .msg-card.err {
-      border-color: rgba(239,35,60,0.4);
-      color: var(--danger);
-    }
-
-    .section-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 14px;
-    }
-
-    .section-title {
-      font-family: var(--font-mono);
-      font-size: 0.82rem;
-      color: var(--text-2);
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-    }
-
-    /* ── Leaflet attribution — keep it technically present but unobtrusive ── */
-    .leaflet-control-attribution {
-      background: transparent !important;
-      box-shadow: none !important;
-      font-size: 0.55rem !important;
-      opacity: 0.18;
-      transition: opacity 0.3s;
-      color: var(--text-3) !important;
-    }
-    .leaflet-control-attribution:hover { opacity: 0.55; }
-    .leaflet-control-attribution a { color: var(--text-3) !important; }
+    /* Sidebar */
+    .sidebar { transition: width 0.25s ease; }
+    .sidebar.collapsed { width: 56px !important; }
+    .sidebar.collapsed .stxt { display: none; }
   </style>
 </head>
+<body class="bg-base text-gray-100 font-sans h-screen overflow-hidden">
 
-<body>
-<div class="layout">
+<!-- ========== COMMAND PALETTE (Ctrl+K) ========== -->
+<div class="cmd-bg" id="cmdPalette">
+  <div class="glass-strong rounded-xl w-[560px] shadow-2xl anim-fade">
+    <div class="flex items-center gap-3 px-4 py-3 border-b border-white/10">
+      <i data-lucide="search" class="w-5 h-5 text-accent"></i>
+      <input id="cmdInput" type="text" class="flex-1 bg-transparent outline-none text-gray-100 font-mono text-sm placeholder:text-gray-500" placeholder="Search IOCs, navigate, or type a command..." autocomplete="off">
+      <kbd class="text-[10px] font-mono text-gray-500 bg-white/5 px-1.5 py-0.5 rounded border border-white/10">ESC</kbd>
+    </div>
+    <div id="cmdResults" class="max-h-[300px] overflow-y-auto p-2">
+      <div class="px-3 py-1.5 text-[10px] text-gray-500 font-mono uppercase tracking-wider">Quick Actions</div>
+      <button class="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/5 text-left text-sm text-gray-300" onclick="openDrawer('ip');closeCmdPalette()">
+        <i data-lucide="globe" class="w-4 h-4 text-tlp-red"></i> <span>IP Reputation Lookup</span> <kbd class="ml-auto text-[10px] text-gray-600 font-mono">ip</kbd>
+      </button>
+      <button class="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/5 text-left text-sm text-gray-300" onclick="openDrawer('hash');closeCmdPalette()">
+        <i data-lucide="file-lock" class="w-4 h-4 text-tlp-amber"></i> <span>File Hash Lookup</span> <kbd class="ml-auto text-[10px] text-gray-600 font-mono">hash</kbd>
+      </button>
+      <button class="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/5 text-left text-sm text-gray-300" onclick="openDrawer('domain');closeCmdPalette()">
+        <i data-lucide="at-sign" class="w-4 h-4 text-accent"></i> <span>Domain Lookup</span> <kbd class="ml-auto text-[10px] text-gray-600 font-mono">domain</kbd>
+      </button>
+      <button class="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/5 text-left text-sm text-gray-300" onclick="openDrawer('url');closeCmdPalette()">
+        <i data-lucide="link" class="w-4 h-4 text-tlp-green"></i> <span>URL Scan</span> <kbd class="ml-auto text-[10px] text-gray-600 font-mono">url</kbd>
+      </button>
+      <button class="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/5 text-left text-sm text-gray-300" onclick="openDrawer('bulk');closeCmdPalette()">
+        <i data-lucide="scan-text" class="w-4 h-4 text-purple-400"></i> <span>Bulk IOC Scraper</span> <kbd class="ml-auto text-[10px] text-gray-600 font-mono">bulk</kbd>
+      </button>
+    </div>
+  </div>
+</div>
 
-  <!-- ================================================================
-       SIDEBAR
-       Contains: logo, navigation buttons, API status indicators
-  ================================================================ -->
-  <nav class="sidebar" id="sidebar">
-    <div class="sidebar-logo">
-      <div class="name"><span>🛡</span></div>
+<!-- ========== IOC SIDE DRAWER ========== -->
+<div class="drawer-bg" id="drawerBg" onclick="closeDrawer()"></div>
+<div class="drawer glass-strong" id="drawerPanel">
+  <div class="p-4 border-b border-white/10 flex items-center justify-between">
+    <h2 class="font-mono font-semibold text-accent flex items-center gap-2" id="drawerTitle">
+      <i data-lucide="search" class="w-5 h-5"></i> IOC Lookup
+    </h2>
+    <button onclick="closeDrawer()" class="text-gray-400 hover:text-white p-1 rounded-lg hover:bg-white/10">
+      <i data-lucide="x" class="w-5 h-5"></i>
+    </button>
+  </div>
+  <div class="flex border-b border-white/10 px-2">
+    <button class="dtab active px-3 py-2 text-xs font-mono border-b-2 border-transparent text-gray-400 hover:text-gray-200" onclick="switchDrawerTab('ip',this)">IP</button>
+    <button class="dtab px-3 py-2 text-xs font-mono border-b-2 border-transparent text-gray-400 hover:text-gray-200" onclick="switchDrawerTab('hash',this)">Hash</button>
+    <button class="dtab px-3 py-2 text-xs font-mono border-b-2 border-transparent text-gray-400 hover:text-gray-200" onclick="switchDrawerTab('domain',this)">Domain</button>
+    <button class="dtab px-3 py-2 text-xs font-mono border-b-2 border-transparent text-gray-400 hover:text-gray-200" onclick="switchDrawerTab('url',this)">URL</button>
+    <button class="dtab px-3 py-2 text-xs font-mono border-b-2 border-transparent text-gray-400 hover:text-gray-200" onclick="switchDrawerTab('bulk',this)">Bulk</button>
+  </div>
+
+  <div class="p-4 overflow-y-auto" style="height:calc(100vh - 105px);">
+    <!-- IP Panel -->
+    <div class="dpanel" id="dp-ip">
+      <div class="flex gap-2 mb-4">
+        <input id="ip-input" type="text" class="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 font-mono text-sm text-gray-100 outline-none focus:border-accent/50 placeholder:text-gray-600" placeholder="e.g. 185.220.101.45" onkeydown="if(event.key==='Enter')lookupIP()">
+        <button class="bg-accent-dim hover:bg-accent text-white text-xs font-mono px-4 py-2 rounded-lg transition-colors" onclick="lookupIP()" id="ip-btn">Check â†’</button>
+      </div>
+      <div id="ip-result" class="text-sm text-gray-400">Enter an IP to check its abuse reputation via AbuseIPDB.</div>
+    </div>
+    <!-- Hash Panel -->
+    <div class="dpanel hidden" id="dp-hash">
+      <div class="flex gap-2 mb-4">
+        <input id="hash-input" type="text" class="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 font-mono text-sm text-gray-100 outline-none focus:border-accent/50 placeholder:text-gray-600" placeholder="MD5 / SHA-1 / SHA-256" onkeydown="if(event.key==='Enter')lookupHash()">
+        <button class="bg-accent-dim hover:bg-accent text-white text-xs font-mono px-4 py-2 rounded-lg transition-colors" onclick="lookupHash()" id="hash-btn">Check â†’</button>
+      </div>
+      <div id="hash-result" class="text-sm text-gray-400">Enter a file hash to check against 70+ AV engines via VirusTotal.</div>
+    </div>
+    <!-- Domain Panel -->
+    <div class="dpanel hidden" id="dp-domain">
+      <div class="flex gap-2 mb-4">
+        <input id="domain-input" type="text" class="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 font-mono text-sm text-gray-100 outline-none focus:border-accent/50 placeholder:text-gray-600" placeholder="e.g. malicious-site.ru" onkeydown="if(event.key==='Enter')lookupDomain()">
+        <button class="bg-accent-dim hover:bg-accent text-white text-xs font-mono px-4 py-2 rounded-lg transition-colors" onclick="lookupDomain()" id="domain-btn">Check â†’</button>
+      </div>
+      <div id="domain-result" class="text-sm text-gray-400">Enter a domain to check its reputation via VirusTotal.</div>
+    </div>
+    <!-- URL Panel -->
+    <div class="dpanel hidden" id="dp-url">
+      <div class="flex gap-2 mb-4">
+        <input id="url-input" type="text" class="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 font-mono text-sm text-gray-100 outline-none focus:border-accent/50 placeholder:text-gray-600" placeholder="https://suspicious-site.com/payload" onkeydown="if(event.key==='Enter')scanURL()">
+        <button class="bg-accent-dim hover:bg-accent text-white text-xs font-mono px-4 py-2 rounded-lg transition-colors" onclick="scanURL()" id="url-btn">Scan â†’</button>
+      </div>
+      <div id="url-result" class="text-sm text-gray-400">Submit a URL to VirusTotal for scanning.</div>
+    </div>
+    <!-- Bulk Scraper Panel -->
+    <div class="dpanel hidden" id="dp-bulk">
+      <p class="text-xs text-gray-400 mb-2 font-mono">Paste logs, emails, or raw text. IPs and hashes will be auto-extracted and looked up in parallel.</p>
+      <textarea id="bulk-input" class="w-full h-32 bg-white/5 border border-white/10 rounded-lg px-3 py-2 font-mono text-sm text-gray-100 outline-none focus:border-accent/50 placeholder:text-gray-600 resize-none" placeholder="Paste text containing IPs or hashes..."></textarea>
+      <button class="mt-2 w-full bg-purple-600 hover:bg-purple-500 text-white text-xs font-mono px-4 py-2 rounded-lg transition-colors flex items-center justify-center gap-2" onclick="bulkScrape()" id="bulk-btn">
+        <i data-lucide="scan-text" class="w-4 h-4"></i> Extract & Lookup IOCs
+      </button>
+      <div id="bulk-result" class="mt-4 text-sm"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ========== MAIN LAYOUT ========== -->
+<div class="flex h-screen">
+
+  <!-- Sidebar -->
+  <nav class="sidebar w-56 bg-base-light border-r border-white/5 flex flex-col py-4 flex-shrink-0" id="sidebar">
+    <div class="px-4 pb-4 border-b border-white/5 flex items-center gap-2">
+      <div class="w-8 h-8 rounded-lg bg-accent/10 flex items-center justify-center flex-shrink-0">
+        <i data-lucide="shield" class="w-5 h-5 text-accent"></i>
+      </div>
+      <div class="stxt">
+        <div class="font-mono font-semibold text-accent text-sm leading-tight">ThreatIQ</div>
+        <div class="text-[10px] text-gray-500">Threat Intel Platform</div>
+      </div>
     </div>
 
-    <div class="nav-section">
-      <div class="nav-label">Navigation</div>
-      <button class="nav-btn active" onclick="showPage('dashboard')">
-        <span class="nav-icon">📊</span><span class="nav-btn-text"> Dashboard</span>
+    <div class="px-3 pt-4">
+      <div class="stxt text-[10px] text-gray-500 font-mono uppercase tracking-wider px-2 mb-2">Navigation</div>
+      <button class="nav-btn active w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-gray-300 hover:bg-white/5 mb-0.5" onclick="showPage('dashboard')">
+        <i data-lucide="layout-dashboard" class="w-4 h-4"></i> <span class="stxt">Dashboard</span>
       </button>
-      <button class="nav-btn" onclick="showPage('briefing')">
-        <span class="nav-icon">🤖</span><span class="nav-btn-text"> AI Briefing</span>
+      <button class="nav-btn w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-gray-300 hover:bg-white/5 mb-0.5" onclick="openDrawer('ip')">
+        <i data-lucide="search" class="w-4 h-4"></i> <span class="stxt">IOC Lookup</span>
       </button>
-      <button class="nav-btn" onclick="showPage('ioc')">
-        <span class="nav-icon">🔍</span><span class="nav-btn-text"> IOC Lookup</span>
+      <button class="nav-btn w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-gray-300 hover:bg-white/5 mb-0.5" onclick="openDrawer('bulk')">
+        <i data-lucide="scan-text" class="w-4 h-4"></i> <span class="stxt">Bulk Scraper</span>
       </button>
-      <button class="nav-btn" onclick="showPage('otx')">
-        <span class="nav-icon">📡</span><span class="nav-btn-text"> OTX Pulses</span>
+      <button class="nav-btn w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-gray-300 hover:bg-white/5 mb-0.5" onclick="document.getElementById('tweetfeed-section').scrollIntoView({behavior:'smooth'})">
+        <i data-lucide="twitter" class="w-4 h-4"></i> <span class="stxt">TweetFeed</span>
       </button>
     </div>
 
-    <!-- API Status — fetched from /api/status on load -->
-    <div class="api-status">
-      <div class="api-status-title">API Status</div>
-      <div class="api-row"><span class="api-row-label">Gemini</span>    <div class="dot" id="dot-gemini"></div></div>
-      <div class="api-row"><span class="api-row-label">AbuseIPDB</span> <div class="dot" id="dot-abuse"></div></div>
-      <div class="api-row"><span class="api-row-label">VirusTotal</span><div class="dot" id="dot-vt"></div></div>
-      <div class="api-row"><span class="api-row-label">OTX</span>       <div class="dot" id="dot-otx"></div></div>
+    <!-- API Status -->
+    <div class="mt-auto px-4 pt-3 border-t border-white/5">
+      <div class="stxt text-[10px] text-gray-500 font-mono uppercase tracking-wider mb-2">API Status</div>
+      <div class="space-y-1.5 text-xs text-gray-400">
+        <div class="flex items-center justify-between"><span class="stxt">Gemini</span><div class="w-2 h-2 rounded-full bg-tlp-red" id="dot-gemini"></div></div>
+        <div class="flex items-center justify-between"><span class="stxt">AbuseIPDB</span><div class="w-2 h-2 rounded-full bg-tlp-red" id="dot-abuse"></div></div>
+        <div class="flex items-center justify-between"><span class="stxt">VirusTotal</span><div class="w-2 h-2 rounded-full bg-tlp-red" id="dot-vt"></div></div>
+        <div class="flex items-center justify-between"><span class="stxt">OTX</span><div class="w-2 h-2 rounded-full bg-tlp-red" id="dot-otx"></div></div>
+        <div class="flex items-center justify-between"><span class="stxt">TweetFeed</span><div class="w-2 h-2 rounded-full bg-tlp-green" id="dot-tf"></div></div>
+      </div>
     </div>
-
   </nav>
 
-  <!-- ================================================================
-       MAIN CONTENT AREA
-       Five page sections — only one is .active at a time
-  ================================================================ -->
-  <main class="main">
+  <!-- Main Content -->
+  <div class="flex-1 flex flex-col overflow-hidden">
 
-    <!-- Top bar logo strip -->
-    <div class="top-bar">
-      <button class="sidebar-toggle" onclick="toggleSidebar()" title="Toggle sidebar" id="sidebar-toggle-btn">☰</button>
-      <div class="logo-wrap">
-        <div class="logo-name">🛡 ThreatIQ</div>
-        <div class="logo-tagline">Threat Intelligence Platform</div>
-      </div>
-      <div style="margin-left:auto;" class="live-badge"><span class="live-dot"></span>System Active</div>
-    </div>
-
-    <!-- ============================================================
-         PAGE: DASHBOARD
-    ============================================================ -->
-    <div class="page-section active" id="page-dashboard">
-
-      <div class="page-header">
-        <div style="display:flex;align-items:center;gap:12px;">
-          <h1 class="page-title">Dashboard</h1>
-          <span class="live-badge"><span class="live-dot"></span>Live feeds</span>
-        </div>
-      </div>
-
-      <!-- Stock Ticker — populated by JS -->
-      <div class="ticker-wrap">
-        <div class="ticker-move" id="headline-ticker">
-          <span class="ticker-item">Loading headlines...</span>
-        </div>
-      </div>
-
-      <!-- SANS Internet Stormcast Video Embed -->
-      <div class="section-header" style="margin-bottom:10px;">
-        <div class="section-title">SANS Internet Stormcast</div>
-      </div>
-      <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:16px;margin: 0 auto 24px auto;width:50%;">
-        <iframe width="100%" height="340" src="https://www.youtube.com/embed?listType=playlist&list=UUGyCV0hYfv41aFeIAszil0w" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen style="border-radius:8px;"></iframe>
-      </div>
-
-      <!-- Latest articles preview -->
-      <div class="section-header">
-        <div class="section-title">Latest Threats</div>
-      </div>
-      <div class="articles-grid" id="dashboard-articles">
-        <div class="loader"><div class="spinner"></div> Loading threat feed...</div>
-      </div>
-
-    </div>
-
-    <!-- ============================================================
-         PAGE: IOC LOOKUP
-         IOC = Indicator of Compromise
-         An IOC is evidence that a system has been compromised:
-         malicious IPs, file hashes, domains, etc.
-    ============================================================ -->
-    <div class="page-section" id="page-ioc">
-
-      <div class="page-header">
-        <h1 class="page-title">IOC Lookup</h1>
-        <p class="page-subtitle">IP reputation via AbuseIPDB · File hash, domain &amp; URL scanning via VirusTotal</p>
-      </div>
-
-      <div class="ioc-tabs">
-        <button class="ioc-tab active" onclick="switchIOCTab('ip', this)">🌐 IP Reputation</button>
-        <button class="ioc-tab" onclick="switchIOCTab('hash', this)">🔐 File Hash</button>
-        <button class="ioc-tab" onclick="switchIOCTab('domain', this)">🔎 Domain</button>
-        <button class="ioc-tab" onclick="switchIOCTab('url', this)">🔗 URL Scan</button>
-      </div>
-
-      <!-- IP Tab -->
-      <div class="ioc-panel active" id="ioc-ip">
-        <div class="input-row">
-          <input class="ioc-input" id="ip-input" type="text"
-            placeholder="Enter IPv4 or IPv6 address  e.g. 185.220.101.45"
-            onkeydown="if(event.key==='Enter') lookupIP()">
-          <button class="lookup-btn" onclick="lookupIP()" id="ip-btn">Check IP →</button>
-        </div>
-        <div id="ip-result">
-          <div class="msg-card" style="color:var(--text-2);">
-            Enter an IP address above to check its abuse confidence score,
-            country of origin, and recent report history via AbuseIPDB.
-            <br><br>
-            <strong>Try these:</strong> 185.220.101.45 (Tor exit node) · 45.33.32.156 (scanner) · 8.8.8.8 (benign)
-          </div>
-        </div>
-      </div>
-
-      <!-- Hash Tab -->
-      <div class="ioc-panel" id="ioc-hash">
-        <div class="input-row">
-          <input class="ioc-input" id="hash-input" type="text"
-            placeholder="Enter MD5, SHA-1, or SHA-256 hash"
-            onkeydown="if(event.key==='Enter') lookupHash()">
-          <button class="lookup-btn" onclick="lookupHash()" id="hash-btn">Check Hash →</button>
-        </div>
-        <div id="hash-result">
-          <div class="msg-card" style="color:var(--text-2);">
-            Enter a file hash above to check it against 70+ antivirus engines
-            via VirusTotal. Supports MD5, SHA-1, and SHA-256.
-          </div>
-        </div>
-      </div>
-
-      <!-- Domain Tab -->
-      <div class="ioc-panel" id="ioc-domain">
-        <div class="input-row">
-          <input class="ioc-input" id="domain-input" type="text"
-            placeholder="Enter a domain  e.g. malicious-site.ru"
-            onkeydown="if(event.key==='Enter') lookupDomain()">
-          <button class="lookup-btn" onclick="lookupDomain()" id="domain-btn">Check Domain →</button>
-        </div>
-        <div id="domain-result">
-          <div class="msg-card" style="color:var(--text-2);">
-            Enter a domain to check its reputation, categories, and AV engine detections via VirusTotal.
-            <br><br>
-            <strong>Try these:</strong> ebay.com (benign) · malware.wicar.org (test malware) · phishtank.com (reference)
-          </div>
-        </div>
-      </div>
-
-      <!-- URL Scan Tab -->
-      <div class="ioc-panel" id="ioc-url">
-        <div class="input-row">
-          <input class="ioc-input" id="url-input" type="text"
-            placeholder="Enter a full URL  e.g. https://suspicious-site.com/payload"
-            onkeydown="if(event.key==='Enter') scanURL()">
-          <button class="lookup-btn" onclick="scanURL()" id="url-btn">Scan URL →</button>
-        </div>
-        <div id="url-result">
-          <div class="msg-card" style="color:var(--text-2);">
-            Submit a live URL to VirusTotal for scanning against 70+ AV engines and URL reputation databases.
-            Useful for checking suspicious links from phishing emails. Results usually return in 5–15 seconds.
-          </div>
-        </div>
-      </div>
-
-    </div>
-
-    <!-- ============================================================
-         PAGE: AI BRIEFING
-    ============================================================ -->
-    <div class="page-section" id="page-briefing">
-
-      <div class="page-header">
-        <h1 class="page-title">AI Threat Briefing</h1>
-        <p class="page-subtitle">Gemini analyzes today's security headlines and generates a SOC-ready briefing</p>
-      </div>
-
-      <button class="generate-btn" onclick="generateBriefing()" id="briefing-btn">
-        <span>⚡</span> Generate Today's Briefing
+    <!-- Top Bar -->
+    <header class="h-[52px] bg-base-light/80 backdrop-blur-md border-b border-white/5 flex items-center px-4 gap-3 flex-shrink-0">
+      <button onclick="toggleSidebar()" class="text-gray-400 hover:text-accent p-1.5 rounded-lg hover:bg-white/5 transition-colors" id="sidebar-toggle">
+        <i data-lucide="panel-left" class="w-4 h-4"></i>
       </button>
+      <div class="flex items-center gap-2 cursor-pointer hover:bg-white/5 px-2 py-1 rounded-lg transition-colors flex-1 max-w-md border border-white/5" onclick="openCmdPalette()">
+        <i data-lucide="search" class="w-3.5 h-3.5 text-gray-500"></i>
+        <span class="text-xs text-gray-500">Search IOCs or commands...</span>
+        <kbd class="ml-auto text-[10px] font-mono text-gray-600 bg-white/5 px-1.5 py-0.5 rounded border border-white/10">Ctrl+K</kbd>
+      </div>
+      <div class="ml-auto flex items-center gap-3">
+        <div class="flex items-center gap-1.5 bg-tlp-green/10 border border-tlp-green/20 rounded-full px-2.5 py-1">
+          <div class="w-1.5 h-1.5 rounded-full bg-tlp-green anim-pulse"></div>
+          <span class="text-[10px] font-mono text-tlp-green">SYSTEM ACTIVE</span>
+        </div>
+      </div>
+    </header>
 
-      <div id="briefing-output">
-        <div class="msg-card" style="color:var(--text-2);">
-          Click the button above to generate a real-time threat intelligence briefing.
-          Gemini will analyze the latest headlines from all RSS feeds and produce
-          a professional SOC-style briefing with threat level assessment.
+    <!-- Bento Grid Dashboard -->
+    <div class="bento" id="page-dashboard">
+
+      <!-- Row 1: Ticker -->
+      <div class="bento-ticker glass rounded-lg overflow-hidden flex items-center bento-card">
+        <div class="whitespace-nowrap anim-ticker" id="headline-ticker">
+          <span class="inline-block px-6 font-mono text-xs text-gray-400">Loading headlines...</span>
         </div>
       </div>
 
-    </div>
-
-    <!-- ============================================================
-         PAGE: OTX PULSES
-    ============================================================ -->
-    <div class="page-section" id="page-otx">
-
-      <div class="page-header">
-        <h1 class="page-title">OTX Threat Pulses</h1>
-        <p class="page-subtitle">Crowd-sourced threat intelligence from AlienVault Open Threat Exchange</p>
+      <!-- Row 2: KPI Cards -->
+      <div class="glass rounded-lg p-3 bento-card bento-kpi flex flex-col justify-center">
+        <div class="text-[10px] font-mono text-gray-500 uppercase tracking-wider flex items-center gap-1.5">
+          <i data-lucide="newspaper" class="w-3 h-3"></i> Articles
+        </div>
+        <div class="text-2xl font-semibold text-gray-100 font-mono mt-1" id="kpi-articles">â€”</div>
+        <div class="text-[10px] text-gray-500" id="kpi-sources">loading</div>
+      </div>
+      <div class="glass rounded-lg p-3 bento-card bento-kpi flex flex-col justify-center">
+        <div class="text-[10px] font-mono text-gray-500 uppercase tracking-wider flex items-center gap-1.5">
+          <i data-lucide="radio-tower" class="w-3 h-3"></i> OTX Pulses
+        </div>
+        <div class="text-2xl font-semibold text-gray-100 font-mono mt-1" id="kpi-pulses">â€”</div>
+        <div class="text-[10px] text-gray-500">active threats</div>
+      </div>
+      <div class="glass rounded-lg p-3 bento-card bento-kpi flex flex-col justify-center">
+        <div class="text-[10px] font-mono text-gray-500 uppercase tracking-wider flex items-center gap-1.5">
+          <i data-lucide="map-pin" class="w-3 h-3"></i> Geo Events
+        </div>
+        <div class="text-2xl font-semibold text-gray-100 font-mono mt-1" id="kpi-geo">â€”</div>
+        <div class="text-[10px] text-gray-500">countries mentioned</div>
+      </div>
+      <div class="glass rounded-lg p-3 bento-card bento-kpi flex flex-col justify-center">
+        <div class="text-[10px] font-mono text-gray-500 uppercase tracking-wider flex items-center gap-1.5">
+          <i data-lucide="shield-alert" class="w-3 h-3"></i> Threat Level
+        </div>
+        <div class="text-lg font-semibold font-mono mt-1" id="kpi-threat">
+          <span class="text-tlp-amber">MODERATE</span>
+        </div>
+        <div class="text-[10px] text-gray-500">AI assessed</div>
       </div>
 
-      <div id="otx-output">
-        <div class="loader"><div class="spinner"></div> Loading OTX pulses...</div>
+      <!-- Row 3 Left: Threat Map -->
+      <div class="bento-map glass rounded-lg bento-card overflow-hidden relative flex flex-col">
+        <div class="px-3 py-2 flex items-center justify-between border-b border-white/5 flex-shrink-0">
+          <div class="flex items-center gap-2">
+            <i data-lucide="globe-2" class="w-3.5 h-3.5 text-accent"></i>
+            <span class="text-xs font-mono text-gray-300">Global Threat Map</span>
+          </div>
+          <div class="flex items-center gap-1.5">
+            <div class="w-1.5 h-1.5 rounded-full bg-tlp-red anim-pulse"></div>
+            <span class="text-[10px] font-mono text-gray-500">LIVE</span>
+          </div>
+        </div>
+        <div class="flex-1 relative" id="map-container"></div>
       </div>
 
-    </div>
+      <!-- Row 3 Right: Threat Feed -->
+      <div class="bento-feed glass rounded-lg bento-card flex flex-col overflow-hidden">
+        <div class="px-3 py-2 flex items-center justify-between border-b border-white/5 flex-shrink-0">
+          <div class="flex items-center gap-2">
+            <i data-lucide="rss" class="w-3.5 h-3.5 text-tlp-amber"></i>
+            <span class="text-xs font-mono text-gray-300">Threat Feed</span>
+          </div>
+          <div class="flex gap-1" id="feed-filters">
+            <button class="feed-filter active text-[10px] font-mono px-2 py-0.5 rounded-full border border-white/10 text-gray-300 hover:border-accent/30 transition-colors" data-cat="all">All</button>
+            <button class="feed-filter text-[10px] font-mono px-2 py-0.5 rounded-full border border-white/10 text-gray-400 hover:border-accent/30 transition-colors" data-cat="Malware">Malware</button>
+            <button class="feed-filter text-[10px] font-mono px-2 py-0.5 rounded-full border border-white/10 text-gray-400 hover:border-accent/30 transition-colors" data-cat="Vulnerability">Vuln</button>
+            <button class="feed-filter text-[10px] font-mono px-2 py-0.5 rounded-full border border-white/10 text-gray-400 hover:border-accent/30 transition-colors" data-cat="Phishing">Phish</button>
+          </div>
+        </div>
+        <div class="flex-1 overflow-y-auto p-2 space-y-1.5" id="feed-list">
+          <div class="flex items-center gap-2 p-4 text-gray-500 text-xs font-mono"><div class="w-4 h-4 border-2 border-white/10 border-t-accent rounded-full animate-spin"></div> Loading threat feed...</div>
+        </div>
+      </div>
 
+      <!-- Row 4 Left: AI Briefing -->
+      <div class="bento-briefing glass rounded-lg bento-card flex flex-col overflow-hidden">
+        <div class="px-3 py-2 flex items-center justify-between border-b border-white/5 flex-shrink-0">
+          <div class="flex items-center gap-2">
+            <i data-lucide="bot" class="w-3.5 h-3.5 text-purple-400"></i>
+            <span class="text-xs font-mono text-gray-300">AI Briefing</span>
+          </div>
+          <button class="text-[10px] font-mono px-2 py-0.5 rounded-full bg-accent/10 text-accent border border-accent/20 hover:bg-accent/20 transition-colors flex items-center gap-1" onclick="generateBriefing()" id="briefing-btn">
+            <i data-lucide="zap" class="w-3 h-3"></i> Generate
+          </button>
+        </div>
+        <div class="flex-1 overflow-y-auto p-3" id="briefing-output">
+          <div class="text-sm text-gray-500 font-mono">Click Generate to create an AI-powered threat briefing from today's headlines.</div>
+        </div>
+        <!-- AI Chat Input -->
+        <div class="px-3 py-2 border-t border-white/5 flex gap-2 flex-shrink-0">
+          <input id="ai-chat-input" type="text" class="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 font-mono text-xs text-gray-100 outline-none focus:border-purple-500/50 placeholder:text-gray-600" placeholder="Ask about the briefing..." onkeydown="if(event.key==='Enter')askAI()">
+          <button class="bg-purple-600 hover:bg-purple-500 text-white text-xs font-mono px-3 py-1.5 rounded-lg transition-colors" onclick="askAI()">
+            <i data-lucide="send" class="w-3 h-3"></i>
+          </button>
+        </div>
+      </div>
 
-  </main><!-- /main -->
+      <!-- Row 4 Right: OTX Pulses + SANS -->
+      <div class="bento-otx glass rounded-lg bento-card flex flex-col overflow-hidden">
+        <div class="px-3 py-2 flex items-center justify-between border-b border-white/5 flex-shrink-0">
+          <div class="flex items-center gap-2">
+            <i data-lucide="radio-tower" class="w-3.5 h-3.5 text-tlp-green"></i>
+            <span class="text-xs font-mono text-gray-300">OTX Pulses</span>
+          </div>
+          <button class="text-[10px] font-mono text-gray-500 hover:text-accent transition-colors" onclick="loadOTX(true)">Refresh</button>
+        </div>
+        <div class="flex-1 overflow-y-auto p-2 space-y-1.5" id="otx-output">
+          <div class="flex items-center gap-2 p-4 text-gray-500 text-xs font-mono"><div class="w-4 h-4 border-2 border-white/10 border-t-accent rounded-full animate-spin"></div> Loading pulses...</div>
+        </div>
+      </div>
+
+      <!-- Row 5: TweetFeed Live IOCs -->
+      <div class="bento-tweetfeed glass rounded-lg bento-card flex flex-col overflow-hidden" id="tweetfeed-section">
+        <div class="px-3 py-2 flex items-center justify-between border-b border-white/5 flex-shrink-0">
+          <div class="flex items-center gap-2">
+            <i data-lucide="twitter" class="w-3.5 h-3.5 text-accent"></i>
+            <span class="text-xs font-mono text-gray-300">TweetFeed Live IOCs</span>
+            <span class="text-[9px] font-mono text-gray-600">via X/Twitter researchers</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <div class="flex gap-1" id="tf-type-filters">
+              <button class="tf-filter active text-[10px] font-mono px-2 py-0.5 rounded-full border border-white/10 text-accent" data-type="">All</button>
+              <button class="tf-filter text-[10px] font-mono px-2 py-0.5 rounded-full border border-white/10 text-gray-400 hover:border-accent/30" data-type="ip">IPs</button>
+              <button class="tf-filter text-[10px] font-mono px-2 py-0.5 rounded-full border border-white/10 text-gray-400 hover:border-accent/30" data-type="url">URLs</button>
+              <button class="tf-filter text-[10px] font-mono px-2 py-0.5 rounded-full border border-white/10 text-gray-400 hover:border-accent/30" data-type="domain">Domains</button>
+              <button class="tf-filter text-[10px] font-mono px-2 py-0.5 rounded-full border border-white/10 text-gray-400 hover:border-accent/30" data-type="sha256">SHA256</button>
+              <button class="tf-filter text-[10px] font-mono px-2 py-0.5 rounded-full border border-white/10 text-gray-400 hover:border-accent/30" data-type="md5">MD5</button>
+            </div>
+            <button class="text-[10px] font-mono text-gray-500 hover:text-accent transition-colors" onclick="loadTweetFeed(true)">Refresh</button>
+          </div>
+        </div>
+        <div class="flex-1 flex overflow-hidden">
+          <!-- IOC List -->
+          <div class="flex-1 overflow-y-auto p-2" id="tf-ioc-list">
+            <div class="flex items-center gap-2 p-4 text-gray-500 text-xs font-mono"><div class="w-4 h-4 border-2 border-white/10 border-t-accent rounded-full animate-spin"></div> Loading TweetFeed IOCs...</div>
+          </div>
+          <!-- Tag Sidebar -->
+          <div class="w-48 border-l border-white/5 p-2 overflow-y-auto flex-shrink-0" id="tf-tags-panel">
+            <div class="text-[10px] font-mono text-gray-500 uppercase tracking-wider mb-2 px-1">Trending Tags</div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /bento -->
+  </div><!-- /main content -->
 </div><!-- /layout -->
-
 <script>
-  // ===========================================================================
-  // ThreatIQ — Frontend JavaScript
-  // ===========================================================================
-  //
-  // This script handles:
-  //   1. Page navigation (show/hide sections)
-  //   2. API calls to the FastAPI backend
-  //   3. Rendering data as HTML cards and charts
-  //   4. IOC lookup interactivity
-  //
-  // KEY CONCEPT — fetch():
-  //   The Fetch API is the modern way for JavaScript to make HTTP requests.
-  //   fetch('/api/news') sends a GET request to our FastAPI backend.
-  //   It returns a Promise — the result arrives asynchronously (async/await).
-  //
-  // KEY CONCEPT — async/await:
-  //   async functions let you use await to pause until a Promise resolves.
-  //   Without await, you'd have to chain .then() callbacks everywhere.
-  // ===========================================================================
+// ============================================================
+// ThreatIQ â€” Frontend JavaScript (Core)
+// ============================================================
 
-  // ── 0. Sidebar toggle ──────────────────────────────────────────────────────
+// â”€â”€ State â”€â”€
+let allArticles = [];
+let threatMap = null;
+let mapMarkers = [];
+let currentFilter = 'all';
+let briefingText = '';
 
-  function toggleSidebar() {
-    const layout = document.querySelector('.layout');
-    const btn    = document.getElementById('sidebar-toggle-btn');
-    const collapsed = layout.classList.toggle('sidebar-collapsed');
-    btn.textContent = collapsed ? '☰' : '◀';
+// â”€â”€ Sidebar â”€â”€
+function toggleSidebar() {
+  document.getElementById('sidebar').classList.toggle('collapsed');
+}
 
+// â”€â”€ Command Palette â”€â”€
+function openCmdPalette() {
+  document.getElementById('cmdPalette').classList.add('open');
+  setTimeout(() => document.getElementById('cmdInput').focus(), 100);
+}
+function closeCmdPalette() {
+  document.getElementById('cmdPalette').classList.remove('open');
+  document.getElementById('cmdInput').value = '';
+}
+document.addEventListener('keydown', e => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'k') { e.preventDefault(); openCmdPalette(); }
+  if (e.key === 'Escape') { closeCmdPalette(); closeDrawer(); }
+});
+
+// â”€â”€ IOC Drawer â”€â”€
+function openDrawer(tab) {
+  document.getElementById('drawerBg').classList.add('open');
+  document.getElementById('drawerPanel').classList.add('open');
+  if (tab) {
+    const fakeBtn = document.querySelector(`.dtab`);
+    switchDrawerTab(tab, fakeBtn);
   }
+  setTimeout(() => lucide.createIcons(), 50);
+}
+function closeDrawer() {
+  document.getElementById('drawerBg').classList.remove('open');
+  document.getElementById('drawerPanel').classList.remove('open');
+}
+function switchDrawerTab(tab, btn) {
+  document.querySelectorAll('.dpanel').forEach(p => p.classList.add('hidden'));
+  const panel = document.getElementById('dp-' + tab);
+  if (panel) panel.classList.remove('hidden');
+  document.querySelectorAll('.dtab').forEach(b => { b.classList.remove('active'); b.style.color = ''; b.style.borderBottomColor = 'transparent'; });
+  const tabs = document.querySelectorAll('.dtab');
+  tabs.forEach(t => { if (t.textContent.trim().toLowerCase() === tab) { t.classList.add('active'); t.style.color = '#38bdf8'; t.style.borderBottomColor = '#38bdf8'; }});
+}
 
-  // ── State ──────────────────────────────────────────────────────────────────
-  // Keep the full article list in memory so we can filter without re-fetching
-  let allArticles    = [];
-  let chartsRendered = false;
+// â”€â”€ Helpers â”€â”€
+const SOURCE_DOMAINS = {
+  'Krebs on Security':'krebsonsecurity.com','BleepingComputer':'bleepingcomputer.com',
+  'SANS ISC':'isc.sans.edu','The Hacker News':'thehackernews.com',
+  'Schneier on Security':'schneier.com','Threatpost':'threatpost.com',
+};
+function catColor(cat) {
+  const m = {'Malware':'#FF4C4C','Phishing':'#FFB74D','Vulnerability':'#a78bfa','Data Breach':'#38bdf8','APT / Nation State':'#f472b6'};
+  return m[cat] || '#94a3b8';
+}
+function catBg(cat) {
+  const c = catColor(cat);
+  return c + '20';
+}
+function verdictClass(v) {
+  if (v === 'MALICIOUS') return 'v-mal';
+  if (v === 'SUSPICIOUS') return 'v-sus';
+  if (v === 'CLEAN') return 'v-clean';
+  return 'v-unknown';
+}
+function timeAgo(dateStr) {
+  try {
+    const d = new Date(dateStr);
+    const now = new Date();
+    const diff = Math.floor((now - d) / 1000);
+    if (diff < 3600) return Math.floor(diff/60) + 'm ago';
+    if (diff < 86400) return Math.floor(diff/3600) + 'h ago';
+    return Math.floor(diff/86400) + 'd ago';
+  } catch { return ''; }
+}
 
-  // ── 1. Navigation ──────────────────────────────────────────────────────────
+// â”€â”€ Feed Card Renderer â”€â”€
+function renderFeedItem(a) {
+  const fav = SOURCE_DOMAINS[a.source] ? `<img src="https://www.google.com/s2/favicons?sz=16&domain=${SOURCE_DOMAINS[a.source]}" class="w-3.5 h-3.5 rounded-sm" onerror="this.style.display='none'">` : '';
+  return `<div class="p-2.5 rounded-lg hover:bg-white/5 transition-colors cursor-pointer group" onclick="window.open('${a.link}','_blank')">
+    <div class="flex items-center gap-2 mb-1">
+      <span class="text-[10px] font-mono px-1.5 py-0.5 rounded" style="background:${catBg(a.category)};color:${catColor(a.category)}">${a.category}</span>
+      <span class="flex items-center gap-1 text-[10px] text-gray-500">${fav}${a.source}</span>
+      <span class="text-[10px] text-gray-600 ml-auto">${timeAgo(a.published)}</span>
+    </div>
+    <div class="text-sm text-gray-200 font-medium leading-snug group-hover:text-accent transition-colors">${a.title}</div>
+    <div class="text-xs text-gray-500 mt-1 line-clamp-2">${a.summary || ''}</div>
+  </div>`;
+}
 
-  function showPage(pageName) {
-    // Hide all page sections
-    document.querySelectorAll('.page-section').forEach(el => el.classList.remove('active'));
-    // Show the requested section
-    document.getElementById('page-' + pageName).classList.add('active');
+// â”€â”€ Dashboard Loader â”€â”€
+async function loadDashboard() {
+  try {
+    const [newsRes, statsRes, mapRes] = await Promise.all([
+      fetch('/api/news?limit=30'), fetch('/api/stats'), fetch('/api/news/map')
+    ]);
+    const news = await newsRes.json();
+    const stats = await statsRes.json();
+    const mapData = await mapRes.json();
 
-    // Update active state on sidebar nav buttons
-    document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
-    // Find the button whose onclick contains the page name and mark it active
-    document.querySelectorAll('.nav-btn').forEach(btn => {
-      if (btn.getAttribute('onclick')?.includes("'" + pageName + "'")) {
-        btn.classList.add('active');
-      }
-    });
+    allArticles = news.articles || [];
 
-    // Lazy-load page data when first visited
-    if (pageName === 'briefing') { /* briefing generates on button click */ }
-    if (pageName === 'otx')  loadOTX();
+    // KPIs
+    document.getElementById('kpi-articles').textContent = stats.total_articles || 0;
+    document.getElementById('kpi-sources').textContent = (stats.feed_count || 0) + ' sources';
+
+    // Ticker
+    const ticker = document.getElementById('headline-ticker');
+    if (allArticles.length > 0) {
+      const items = allArticles.slice(0, 15).map(a =>
+        `<span class="inline-block px-5 font-mono text-xs text-gray-400"><span class="text-accent font-semibold mr-2">[${a.source.toUpperCase()}]</span><a href="${a.link}" target="_blank" class="hover:text-gray-200 transition-colors">${a.title}</a></span>`
+      ).join('');
+      ticker.innerHTML = items + items;
+    }
+
+    // Feed list
+    renderFeed('all');
+
+    // Map
+    initMap(mapData);
+    document.getElementById('kpi-geo').textContent = new Set(mapData.map(p => p.country)).size;
+
+    // Load OTX & TweetFeed
+    loadOTX();
+    loadTweetFeed();
+  } catch (err) {
+    document.getElementById('feed-list').innerHTML = `<div class="p-4 text-tlp-red text-xs font-mono">Failed to load: ${err.message}</div>`;
   }
+}
 
-  // ── 2. Category badge helper ────────────────────────────────────────────────
-
-  function categoryClass(cat) {
-    const map = {
-      'Malware':           'malware',
-      'Phishing':          'phishing',
-      'Vulnerability':     'vulnerability',
-      'Data Breach':       'data-breach',
-      'APT / Nation State':'apt',
-    };
-    return 'badge-' + (map[cat] || 'general');
+function renderFeed(cat) {
+  currentFilter = cat;
+  const list = document.getElementById('feed-list');
+  let filtered = cat === 'all' ? allArticles : allArticles.filter(a => a.category === cat);
+  list.innerHTML = filtered.length ? filtered.map(renderFeedItem).join('') : '<div class="p-4 text-gray-500 text-xs font-mono">No articles in this category.</div>';
+  // Update filter buttons
+  document.querySelectorAll('.feed-filter').forEach(b => {
+    b.classList.toggle('active', b.dataset.cat === cat);
+    b.style.borderColor = b.dataset.cat === cat ? 'rgba(56,189,248,0.4)' : '';
+    b.style.color = b.dataset.cat === cat ? '#38bdf8' : '';
+  });
+}
+document.addEventListener('click', e => {
+  if (e.target.closest('.feed-filter')) {
+    renderFeed(e.target.closest('.feed-filter').dataset.cat);
   }
+});
 
-  // ── 3. Article card renderer ────────────────────────────────────────────────
+// â”€â”€ Leaflet Map â”€â”€
+function initMap(points) {
+  if (threatMap) { threatMap.remove(); }
+  threatMap = L.map('map-container', { zoomControl: true, attributionControl: true, minZoom: 2, maxZoom: 6 }).setView([25, 0], 2);
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png', {
+    attribution: '&copy; CARTO', subdomains: 'abcd', maxZoom: 19
+  }).addTo(threatMap);
 
-  // Map source display names → domains for favicon lookup
-  const SOURCE_DOMAINS = {
-    'Krebs on Security':    'krebsonsecurity.com',
-    'BleepingComputer':     'bleepingcomputer.com',
-    'SANS ISC':             'isc.sans.edu',
-    'The Hacker News':      'thehackernews.com',
-    'Schneier on Security': 'schneier.com',
-    'Threatpost':           'threatpost.com',
-  };
+  points.forEach(p => {
+    const icon = L.divIcon({ className: '', html: '<div class="map-dot"></div>', iconSize: [10, 10] });
+    const marker = L.marker([p.lat, p.lng], { icon }).addTo(threatMap);
+    marker.bindPopup(`<div style="font-family:'IBM Plex Mono';font-size:11px;max-width:220px;"><strong style="color:#38bdf8">${p.country}</strong><br>${p.title}<br><a href="${p.url}" target="_blank" style="color:#38bdf8">Read â†’</a></div>`, { className: 'glass-strong', closeButton: false });
+    mapMarkers.push(marker);
+  });
+  setTimeout(() => threatMap.invalidateSize(), 200);
+}
 
-  function sourceFaviconHTML(sourceName) {
-    const domain = SOURCE_DOMAINS[sourceName];
-    if (!domain) return '';
-    const url = `https://www.google.com/s2/favicons?sz=16&domain=${domain}`;
-    return `<img class="source-favicon" src="${url}" alt="" onerror="this.style.display='none'">`;
-  }
-
-  function renderArticleCard(a) {
-    return `
-      <div class="article-card">
-        <div class="article-meta">
-          <span class="badge ${categoryClass(a.category)}">${a.category}</span>
-          <span class="badge badge-source" style="display:inline-flex;align-items:center;gap:4px;">
-            ${sourceFaviconHTML(a.source)}${a.source}
-          </span>
+// â”€â”€ OTX â”€â”€
+async function loadOTX(refresh) {
+  const container = document.getElementById('otx-output');
+  container.innerHTML = '<div class="flex items-center gap-2 p-4 text-gray-500 text-xs font-mono"><div class="w-4 h-4 border-2 border-white/10 border-t-accent rounded-full animate-spin"></div> Loading...</div>';
+  try {
+    const url = refresh ? '/api/otx/pulses?refresh=true' : '/api/otx/pulses';
+    const res = await fetch(url);
+    const data = await res.json();
+    if (data.error) { container.innerHTML = `<div class="p-3 text-tlp-amber text-xs font-mono">${data.error}</div>`; return; }
+    const pulses = data.pulses || [];
+    document.getElementById('kpi-pulses').textContent = pulses.length;
+    if (!pulses.length) { container.innerHTML = '<div class="p-3 text-gray-500 text-xs">No pulses found.</div>'; return; }
+    container.innerHTML = pulses.map(p => {
+      const tlpColor = {white:'#94a3b8',green:'#81C784',amber:'#FFB74D',red:'#FF4C4C'}[p.tlp] || '#94a3b8';
+      const tags = (Array.isArray(p.tags) ? p.tags : (p.tags||'').split(/[\s,]+/)).filter(Boolean).slice(0,4);
+      return `<div class="p-2.5 rounded-lg hover:bg-white/5 transition-colors cursor-pointer" onclick="window.open('https://otx.alienvault.com/pulse/${p.id}','_blank')">
+        <div class="flex items-start justify-between gap-2 mb-1">
+          <div class="text-sm text-gray-200 font-medium leading-snug line-clamp-1">${p.name}</div>
+          <span class="text-[9px] font-mono px-1.5 py-0.5 rounded flex-shrink-0" style="background:${tlpColor}20;color:${tlpColor}">TLP:${(p.tlp||'').toUpperCase()}</span>
         </div>
-        <div class="article-title">
-          <a href="${a.link}" target="_blank" rel="noopener">${a.title}</a>
+        <div class="text-xs text-gray-500 line-clamp-1 mb-1.5">${p.description || ''}</div>
+        <div class="flex items-center gap-1.5 flex-wrap">
+          ${tags.map(t => `<span class="text-[9px] font-mono px-1.5 py-0.5 rounded bg-accent/10 text-accent/70 border border-accent/10">${t}</span>`).join('')}
+          <span class="text-[9px] text-gray-600 ml-auto">${p.indicators_count} IOCs</span>
         </div>
-        <div class="article-summary">${a.summary || 'No summary available.'}</div>
-        <div class="article-date">${a.published || ''}</div>
+      </div>`;
+    }).join('');
+  } catch (err) { container.innerHTML = `<div class="p-3 text-tlp-red text-xs font-mono">Error: ${err.message}</div>`; }
+}
+
+// ── TweetFeed ──
+let allTweetFeedIOCs = [];
+let currentTfType = '';
+
+async function loadTweetFeed(refresh) {
+  const container = document.getElementById('tf-ioc-list');
+  container.innerHTML = '<div class="flex items-center gap-2 p-4 text-gray-500 text-xs font-mono"><div class="w-4 h-4 border-2 border-white/10 border-t-accent rounded-full animate-spin"></div> Loading TweetFeed IOCs...</div>';
+  try {
+    let apiUrl = '/api/tweetfeed?period=today';
+    if (currentTfType) apiUrl += `&ioc_type=${currentTfType}`;
+    if (refresh) apiUrl += '&refresh=true';
+    const res = await fetch(apiUrl);
+    const data = await res.json();
+    if (data.error) { container.innerHTML = `<div class="p-3 text-tlp-amber text-xs font-mono">${data.error}</div>`; return; }
+    allTweetFeedIOCs = data.iocs || [];
+    renderTweetFeedIOCs(allTweetFeedIOCs);
+    // Render tags sidebar
+    const tagsPanel = document.getElementById('tf-tags-panel');
+    const topTags = data.top_tags || [];
+    tagsPanel.innerHTML = '<div class="text-[10px] font-mono text-gray-500 uppercase tracking-wider mb-2 px-1">Trending Tags</div>' +
+      topTags.map(t => `<div class="flex items-center justify-between px-1.5 py-1 rounded hover:bg-white/5 cursor-pointer text-[10px]">
+        <span class="font-mono text-accent/80">#${t.tag}</span>
+        <span class="font-mono text-gray-600">${t.count}</span>
+      </div>`).join('') +
+      `<div class="mt-3 pt-2 border-t border-white/5 px-1 text-[10px] font-mono text-gray-600">
+        ${data.total || 0} total IOCs today<br>
+        ${Object.entries(data.type_breakdown||{}).map(([k,v])=>`${k}: ${v}`).join(' · ')}
+      </div>`;
+  } catch (err) { container.innerHTML = `<div class="p-3 text-tlp-red text-xs font-mono">Error: ${err.message}</div>`; }
+}
+
+function renderTweetFeedIOCs(iocs) {
+  const container = document.getElementById('tf-ioc-list');
+  if (!iocs.length) { container.innerHTML = '<div class="p-3 text-gray-500 text-xs font-mono">No IOCs found for this filter.</div>'; return; }
+  const typeColors = {ip:'#FF4C4C', url:'#FFB74D', domain:'#38bdf8', sha256:'#a78bfa', md5:'#81C784'};
+  container.innerHTML = '<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-1.5">' + iocs.slice(0, 60).map(ioc => {
+    const color = typeColors[ioc.type] || '#94a3b8';
+    const tags = (ioc.tags || []).slice(0, 3).map(t => `<span class="text-[9px] font-mono px-1 py-0.5 rounded bg-white/5 text-gray-500">${t}</span>`).join('');
+    const val = ioc.value.length > 60 ? ioc.value.substring(0,57)+'...' : ioc.value;
+    return `<div class="p-2 rounded-lg hover:bg-white/5 transition-colors cursor-pointer group" onclick="window.open('${ioc.tweet}','_blank')">
+      <div class="flex items-center gap-2 mb-1">
+        <span class="text-[9px] font-mono font-semibold px-1.5 py-0.5 rounded" style="background:${color}20;color:${color}">${ioc.type.toUpperCase()}</span>
+        <span class="text-[10px] text-gray-500 font-mono">@${ioc.user}</span>
+        <span class="text-[10px] text-gray-600 ml-auto">${ioc.date ? ioc.date.split(' ')[1] || '' : ''}</span>
       </div>
-    `;
+      <div class="font-mono text-xs text-gray-200 break-all group-hover:text-accent transition-colors">${val}</div>
+      <div class="flex gap-1 mt-1">${tags}</div>
+    </div>`;
+  }).join('') + '</div>';
+}
+
+// TweetFeed type filter clicks
+document.addEventListener('click', e => {
+  const tfBtn = e.target.closest('.tf-filter');
+  if (tfBtn) {
+    currentTfType = tfBtn.dataset.type;
+    document.querySelectorAll('.tf-filter').forEach(b => {
+      b.classList.toggle('active', b === tfBtn);
+      b.style.color = b === tfBtn ? '#38bdf8' : '';
+      b.style.borderColor = b === tfBtn ? 'rgba(56,189,248,0.4)' : '';
+    });
+    loadTweetFeed(false);
   }
+});
+</script>
+<script>
+// ============================================================
+// ThreatIQ â€” Frontend JavaScript (IOC Lookups + AI + Init)
+// ============================================================
 
-  // ── 4. Dashboard Loader ────────────────────────────────────────────────────
-
-  async function loadDashboard() {
-    try {
-      // Fetch stats and articles in parallel
-      const [statsRes, newsRes] = await Promise.all([
-        fetch('/api/stats'),
-        fetch('/api/news?limit=10')
-      ]);
-
-      const stats = await statsRes.json();
-      const news  = await newsRes.json();
-
-      // Render stock ticker headlines
-      const tickerContainer = document.getElementById('headline-ticker');
-      if (news.articles && news.articles.length > 0) {
-        const itemsHtml = news.articles.map(a => 
-          `<div class="ticker-item"><span>[${a.source.toUpperCase()}]</span><a href="${a.link}" target="_blank">${a.title}</a></div>`
-        ).join('');
-        tickerContainer.innerHTML = itemsHtml + itemsHtml; // duplicate for longer ticker content
-      } else {
-        tickerContainer.innerHTML = '<span class="ticker-item">No recent articles found.</span>';
-      }
-
-      // Render latest article cards
-      const container = document.getElementById('dashboard-articles');
-      const articles  = news.articles || [];
-      container.innerHTML = articles.length
-        ? articles.map(renderArticleCard).join('')
-        : '<div class="msg-card warn">Could not load articles. Check your internet connection.</div>';
-
-      // Store all articles for the feed page
-      allArticles = articles;
-
-
-
-    } catch (err) {
-      console.error('Dashboard load error:', err);
-      document.getElementById('dashboard-articles').innerHTML =
-        `<div class="msg-card err">Failed to load feed: ${err.message}</div>`;
-    }
-  }
-
-  // ── 5. Chart.js Charts ─────────────────────────────────────────────────────
-  //
-  // Chart.js is a JavaScript library for drawing charts using the HTML <canvas> element.
-  // We load it from a CDN (Content Delivery Network) — a globally distributed server
-  // that delivers library files quickly without us hosting them ourselves.
-  //
-  // new Chart(canvas, config) — creates a chart on a canvas element.
-  // The config has:
-  //   type  — 'doughnut', 'bar', 'line', etc.
-  //   data  — labels + datasets
-  //   options — styling/behavior
-
-  // Fixed color palette keyed by category name — must match the badge CSS colors
-  const CATEGORY_COLORS = {
-    'Malware':            { bg: 'rgba(239,35,60,0.3)',    border: '#ef233c' },
-    'Phishing':           { bg: 'rgba(244,162,97,0.3)',   border: '#f4a261' },
-    'Vulnerability':      { bg: 'rgba(157,78,221,0.3)',   border: '#9d4edd' },
-    'Data Breach':        { bg: 'rgba(0,180,216,0.3)',    border: '#00b4d8' },
-    'APT / Nation State': { bg: 'rgba(239,35,60,0.4)',    border: '#ff4d6d' },
-    'General':            { bg: 'rgba(112,144,174,0.3)',  border: '#7090ae' },
-  };
-  const DEFAULT_COLOR = { bg: 'rgba(112,144,174,0.3)', border: '#7090ae' };
-
-  function renderCharts(stats) {
-    const cats = stats.category_distribution || {};
-    // Sort categories by count for a cleaner bar chart
-    const sortedLabels = Object.keys(cats).sort((a, b) => cats[b] - cats[a]);
-    const sortedData   = sortedLabels.map(l => cats[l]);
-
-    // Derive colors per label from the fixed map (no positional guessing)
-    const bgColors     = sortedLabels.map(l => (CATEGORY_COLORS[l] || DEFAULT_COLOR).bg);
-    const borderColors = sortedLabels.map(l => (CATEGORY_COLORS[l] || DEFAULT_COLOR).border);
-
-    const catCanvas = document.getElementById('chartCategories');
-    if (catCanvas) {
-      new Chart(catCanvas, {
-        type: 'bar',
-        data: {
-          labels:   sortedLabels,
-          datasets: [{
-            label:           'Volume',
-            data:            sortedData,
-            backgroundColor: bgColors,
-            borderColor:     borderColors,
-            borderWidth:     1,
-            borderRadius:    5,
-          }]
-        },
-        options: {
-          indexAxis:           'y',  // Horizontal bars
-          responsive:          true,
-          maintainAspectRatio: false,
-          plugins: {
-            legend: { display: false } // No legend needed for horizontal bars with labeled Y-axis
-          },
-          scales: {
-            x: {
-              grid:  { color: 'rgba(255,255,255,0.05)' },
-              ticks: { color: '#7090ae', font: { size: 11, family: "'IBM Plex Mono'" } }
-            },
-            y: {
-              grid:  { display: false },
-              ticks: { 
-                color: '#f8fafc', 
-                font: { size: 12, family: "'IBM Plex Mono'", weight: '600' }
-              }
-            }
-          }
-        }
-      });
-    }
-  }
-
-
-
-  // ── 7. IOC Tab Switching ────────────────────────────────────────────────────
-
-  function switchIOCTab(tab, btn) {
-    // Hide all panels, show selected
-    document.querySelectorAll('.ioc-panel').forEach(p => p.classList.remove('active'));
-    document.getElementById('ioc-' + tab).classList.add('active');
-
-    // Update tab buttons
-    document.querySelectorAll('.ioc-tab').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-  }
-
-  // ── 8. IP Lookup ────────────────────────────────────────────────────────────
-
-  async function lookupIP() {
-    const input = document.getElementById('ip-input');
-    const btn   = document.getElementById('ip-btn');
-    const ip    = input.value.trim();
-
-    if (!ip) return;
-
-    // Show loading state
-    btn.disabled = true;
-    btn.textContent = 'Checking...';
-    document.getElementById('ip-result').innerHTML =
-      '<div class="loader"><div class="spinner"></div> Querying AbuseIPDB...</div>';
-
-    try {
-      const res  = await fetch(`/api/ioc/ip/${encodeURIComponent(ip)}`);
-      const data = await res.json();
-
-      if (data.error) {
-        document.getElementById('ip-result').innerHTML =
-          `<div class="msg-card warn">⚠ ${data.error}</div>`;
-        return;
-      }
-
-      const score   = data.abuseConfidenceScore || 0;
-      const verdict = data.verdict || (score >= 75 ? 'MALICIOUS' : score >= 25 ? 'SUSPICIOUS' : 'CLEAN');
-
-      document.getElementById('ip-result').innerHTML = `
-        <div class="ioc-result">
-          <div class="verdict-banner">
-            <div>
-              <div style="font-family:var(--font-mono);font-size:1.1rem;color:var(--text-1);">${ip}</div>
-              <div style="font-size:0.75rem;color:var(--text-2);margin-top:2px;">${data.usageType || ''} · ${data.isp || ''}</div>
-            </div>
-            <div class="verdict-badge verdict-${verdict}">${verdict}</div>
-          </div>
-
-          <div class="ioc-fields">
-            <div class="ioc-field">
-              <div class="fk">Abuse Score</div>
-              <div class="fv">${score}%</div>
-              <div class="detection-bar" style="margin-top:6px;">
-                <div class="detection-fill" style="width:${score}%;background:${score>=75?'var(--danger)':score>=25?'var(--warning)':'var(--success)'}"></div>
-              </div>
-            </div>
-            <div class="ioc-field">
-              <div class="fk">Total Reports</div>
-              <div class="fv">${data.totalReports || 0}</div>
-            </div>
-            <div class="ioc-field">
-              <div class="fk">Country</div>
-              <div class="fv">${data.countryCode || 'Unknown'}</div>
-            </div>
-            <div class="ioc-field">
-              <div class="fk">ISP / Domain</div>
-              <div class="fv" style="font-size:0.78rem;">${data.domain || data.isp || 'Unknown'}</div>
-            </div>
-            <div class="ioc-field">
-              <div class="fk">Public IP</div>
-              <div class="fv">${data.isPublic ? 'Yes' : 'No'}</div>
-            </div>
-            <div class="ioc-field">
-              <div class="fk">Last Reported</div>
-              <div class="fv" style="font-size:0.78rem;">${data.lastReportedAt ? new Date(data.lastReportedAt).toLocaleDateString() : 'Never'}</div>
-            </div>
-          </div>
+// â”€â”€ IP Lookup â”€â”€
+async function lookupIP() {
+  const input = document.getElementById('ip-input');
+  const btn = document.getElementById('ip-btn');
+  const ip = input.value.trim();
+  if (!ip) return;
+  btn.disabled = true; btn.textContent = '...';
+  document.getElementById('ip-result').innerHTML = '<div class="flex items-center gap-2 text-gray-500 text-xs font-mono py-2"><div class="w-3 h-3 border-2 border-white/10 border-t-accent rounded-full animate-spin"></div> Querying AbuseIPDB...</div>';
+  try {
+    const res = await fetch(`/api/ioc/ip/${encodeURIComponent(ip)}`);
+    const d = await res.json();
+    if (d.error) { document.getElementById('ip-result').innerHTML = `<div class="text-tlp-amber text-xs font-mono p-2">${d.error}</div>`; return; }
+    const score = d.abuseConfidenceScore || 0;
+    const verdict = d.verdict || (score >= 75 ? 'MALICIOUS' : score >= 25 ? 'SUSPICIOUS' : 'CLEAN');
+    const barColor = score >= 75 ? '#FF4C4C' : score >= 25 ? '#FFB74D' : '#81C784';
+    document.getElementById('ip-result').innerHTML = `
+      <div class="bg-white/5 rounded-lg p-3 anim-fade">
+        <div class="flex items-center justify-between mb-3">
+          <div><div class="font-mono text-sm text-gray-100">${ip}</div><div class="text-[10px] text-gray-500">${d.usageType||''} Â· ${d.isp||''}</div></div>
+          <span class="font-mono text-xs font-semibold px-3 py-1 rounded ${verdictClass(verdict)}">${verdict}</span>
         </div>
-      `;
-    } catch (err) {
-      document.getElementById('ip-result').innerHTML =
-        `<div class="msg-card err">Request failed: ${err.message}</div>`;
-    } finally {
-      btn.disabled    = false;
-      btn.textContent = 'Check IP →';
-    }
-  }
-
-  // ── 9. Hash Lookup ──────────────────────────────────────────────────────────
-
-  async function lookupHash() {
-    const input = document.getElementById('hash-input');
-    const btn   = document.getElementById('hash-btn');
-    const hash  = input.value.trim();
-
-    if (!hash) return;
-
-    btn.disabled    = true;
-    btn.textContent = 'Checking...';
-    document.getElementById('hash-result').innerHTML =
-      '<div class="loader"><div class="spinner"></div> Querying VirusTotal...</div>';
-
-    try {
-      const res  = await fetch(`/api/ioc/hash/${encodeURIComponent(hash)}`);
-      const data = await res.json();
-
-      if (data.error) {
-        document.getElementById('hash-result').innerHTML =
-          `<div class="msg-card warn">⚠ ${data.error}</div>`;
-        return;
-      }
-
-      const verdict    = data.verdict || 'UNKNOWN';
-      const detections = data.malicious  || 0;
-      const total      = data.total_engines || 1;
-      const pct        = Math.round((detections / total) * 100);
-
-      document.getElementById('hash-result').innerHTML = `
-        <div class="ioc-result">
-          <div class="verdict-banner">
-            <div>
-              <div style="font-family:var(--font-mono);font-size:0.82rem;color:var(--text-2);word-break:break-all;">${hash}</div>
-              <div style="font-size:0.78rem;color:var(--text-1);margin-top:4px;">${data.name || 'Unknown file'}</div>
-            </div>
-            <div class="verdict-badge verdict-${verdict}">${verdict}</div>
-          </div>
-
-          <div class="ioc-fields">
-            <div class="ioc-field" style="grid-column:1/-1">
-              <div class="fk">Detection Rate (${detections}/${total} engines)</div>
-              <div class="detection-bar" style="margin-top:6px;height:12px;">
-                <div class="detection-fill" style="width:${pct}%;background:${detections>=3?'var(--danger)':detections>=1?'var(--warning)':'var(--success)'}"></div>
-              </div>
-              <div style="font-size:0.72rem;color:var(--text-3);margin-top:4px;font-family:var(--font-mono);">
-                ${detections} malicious · ${data.suspicious||0} suspicious · ${data.clean||0} clean
-              </div>
-            </div>
-            <div class="ioc-field">
-              <div class="fk">File Type</div>
-              <div class="fv">${data.type || 'Unknown'}</div>
-            </div>
-            <div class="ioc-field">
-              <div class="fk">File Size</div>
-              <div class="fv">${data.size_bytes ? Math.round(data.size_bytes/1024) + ' KB' : 'Unknown'}</div>
-            </div>
-            <div class="ioc-field">
-              <div class="fk">First Seen</div>
-              <div class="fv" style="font-size:0.78rem;">${data.first_seen ? new Date(data.first_seen * 1000).toLocaleDateString() : 'Unknown'}</div>
-            </div>
-          </div>
+        <div class="mb-2"><div class="text-[10px] font-mono text-gray-500 mb-1">Abuse Score: ${score}%</div><div class="det-bar"><div class="det-fill" style="width:${score}%;background:${barColor}"></div></div></div>
+        <div class="grid grid-cols-2 gap-2 text-xs">
+          <div class="bg-white/5 rounded p-2"><div class="text-[10px] font-mono text-gray-500">Reports</div><div class="text-gray-200 font-mono">${d.totalReports||0}</div></div>
+          <div class="bg-white/5 rounded p-2"><div class="text-[10px] font-mono text-gray-500">Country</div><div class="text-gray-200 font-mono">${d.countryCode||'?'}</div></div>
+          <div class="bg-white/5 rounded p-2"><div class="text-[10px] font-mono text-gray-500">Domain</div><div class="text-gray-200 font-mono text-[11px]">${d.domain||d.isp||'?'}</div></div>
+          <div class="bg-white/5 rounded p-2"><div class="text-[10px] font-mono text-gray-500">Last Reported</div><div class="text-gray-200 font-mono text-[11px]">${d.lastReportedAt ? new Date(d.lastReportedAt).toLocaleDateString() : 'Never'}</div></div>
         </div>
-      `;
-    } catch (err) {
-      document.getElementById('hash-result').innerHTML =
-        `<div class="msg-card err">Request failed: ${err.message}</div>`;
-    } finally {
-      btn.disabled    = false;
-      btn.textContent = 'Check Hash →';
-    }
-  }
+      </div>`;
+  } catch (err) { document.getElementById('ip-result').innerHTML = `<div class="text-tlp-red text-xs font-mono">${err.message}</div>`; }
+  finally { btn.disabled = false; btn.textContent = 'Check â†’'; }
+}
 
-  // ── 10. Domain Lookup ────────────────────────────────────────────────────────
-
-  async function lookupDomain() {
-    const input  = document.getElementById('domain-input');
-    const btn    = document.getElementById('domain-btn');
-    const domain = input.value.trim().replace(/^https?:\/\//i, '').split('/')[0];
-
-    if (!domain) return;
-
-    btn.disabled    = true;
-    btn.textContent = 'Checking...';
-    document.getElementById('domain-result').innerHTML =
-      '<div class="loader"><div class="spinner"></div> Querying VirusTotal...</div>';
-
-    try {
-      const res  = await fetch(`/api/ioc/domain/${encodeURIComponent(domain)}`);
-      const data = await res.json();
-
-      if (data.error) {
-        document.getElementById('domain-result').innerHTML =
-          `<div class="msg-card warn">⚠ ${data.error}</div>`;
-        return;
-      }
-
-      const verdict    = data.verdict || 'UNKNOWN';
-      const malicious  = data.malicious  || 0;
-      const total      = data.total_engines || 1;
-      const pct        = Math.round((malicious / total) * 100);
-      const repColor   = data.reputation < 0 ? 'var(--danger)' : data.reputation > 0 ? 'var(--success)' : 'var(--text-2)';
-      const cats       = (data.categories || []).join(', ') || 'None detected';
-      const created    = data.creation_date ? new Date(data.creation_date * 1000).toLocaleDateString() : 'Unknown';
-
-      document.getElementById('domain-result').innerHTML = `
-        <div class="ioc-result">
-          <div class="verdict-banner">
-            <div>
-              <div style="font-family:var(--font-mono);font-size:0.9rem;color:var(--text-1);">${domain}</div>
-              <div style="font-size:0.75rem;color:var(--text-3);margin-top:4px;">${data.registrar || 'Registrar unknown'}</div>
-            </div>
-            <div class="verdict-badge verdict-${verdict}">${verdict}</div>
-          </div>
-          <div class="ioc-fields">
-            <div class="ioc-field" style="grid-column:1/-1">
-              <div class="fk">Detection Rate (${malicious}/${total} engines)</div>
-              <div class="detection-bar" style="margin-top:6px;height:12px;">
-                <div class="detection-fill" style="width:${pct}%;background:${malicious>=3?'var(--danger)':malicious>=1?'var(--warning)':'var(--success)'}"></div>
-              </div>
-              <div style="font-size:0.72rem;color:var(--text-3);margin-top:4px;font-family:var(--font-mono);">
-                ${malicious} malicious · ${data.suspicious||0} suspicious · ${data.clean||0} clean
-              </div>
-            </div>
-            <div class="ioc-field">
-              <div class="fk">Reputation Score</div>
-              <div class="fv" style="color:${repColor};">${data.reputation ?? 'N/A'}</div>
-            </div>
-            <div class="ioc-field">
-              <div class="fk">Created</div>
-              <div class="fv" style="font-size:0.78rem;">${created}</div>
-            </div>
-            <div class="ioc-field" style="grid-column:1/-1">
-              <div class="fk">Categories</div>
-              <div class="fv" style="font-size:0.78rem;">${cats}</div>
-            </div>
-          </div>
+// â”€â”€ Hash Lookup â”€â”€
+async function lookupHash() {
+  const input = document.getElementById('hash-input');
+  const btn = document.getElementById('hash-btn');
+  const hash = input.value.trim();
+  if (!hash) return;
+  btn.disabled = true; btn.textContent = '...';
+  document.getElementById('hash-result').innerHTML = '<div class="flex items-center gap-2 text-gray-500 text-xs font-mono py-2"><div class="w-3 h-3 border-2 border-white/10 border-t-accent rounded-full animate-spin"></div> Querying VirusTotal...</div>';
+  try {
+    const res = await fetch(`/api/ioc/hash/${encodeURIComponent(hash)}`);
+    const d = await res.json();
+    if (d.error) { document.getElementById('hash-result').innerHTML = `<div class="text-tlp-amber text-xs font-mono p-2">${d.error}</div>`; return; }
+    const verdict = d.verdict || 'UNKNOWN';
+    const mal = d.malicious || 0, total = d.total_engines || 1, pct = Math.round(mal/total*100);
+    const barColor = mal >= 3 ? '#FF4C4C' : mal >= 1 ? '#FFB74D' : '#81C784';
+    document.getElementById('hash-result').innerHTML = `
+      <div class="bg-white/5 rounded-lg p-3 anim-fade">
+        <div class="flex items-center justify-between mb-3">
+          <div><div class="font-mono text-[11px] text-gray-400 break-all">${hash}</div><div class="text-xs text-gray-200 mt-1">${d.name||'Unknown'}</div></div>
+          <span class="font-mono text-xs font-semibold px-3 py-1 rounded ml-2 flex-shrink-0 ${verdictClass(verdict)}">${verdict}</span>
         </div>
-      `;
-    } catch (err) {
-      document.getElementById('domain-result').innerHTML =
-        `<div class="msg-card err">Request failed: ${err.message}</div>`;
-    } finally {
-      btn.disabled    = false;
-      btn.textContent = 'Check Domain →';
-    }
-  }
-
-  // ── 11. URL Scan ─────────────────────────────────────────────────────────────
-
-  async function scanURL() {
-    const input = document.getElementById('url-input');
-    const btn   = document.getElementById('url-btn');
-    const url   = input.value.trim();
-
-    if (!url) return;
-
-    btn.disabled    = true;
-    btn.textContent = 'Scanning...';
-    document.getElementById('url-result').innerHTML =
-      '<div class="loader"><div class="spinner"></div> Submitting to VirusTotal — this may take up to 15 seconds...</div>';
-
-    try {
-      const res  = await fetch(`/api/ioc/url?url=${encodeURIComponent(url)}`);
-      const data = await res.json();
-
-      if (data.error) {
-        document.getElementById('url-result').innerHTML =
-          `<div class="msg-card warn">⚠ ${data.error}</div>`;
-        return;
-      }
-
-      if (data.verdict === 'PENDING') {
-        document.getElementById('url-result').innerHTML =
-          `<div class="msg-card warn">⏳ ${data.message}</div>`;
-        return;
-      }
-
-      const verdict   = data.verdict || 'UNKNOWN';
-      const malicious = data.malicious  || 0;
-      const total     = data.total_engines || 1;
-      const pct       = Math.round((malicious / total) * 100);
-
-      document.getElementById('url-result').innerHTML = `
-        <div class="ioc-result">
-          <div class="verdict-banner">
-            <div style="flex:1;min-width:0;">
-              <div style="font-family:var(--font-mono);font-size:0.78rem;color:var(--text-2);word-break:break-all;">${url}</div>
-            </div>
-            <div class="verdict-badge verdict-${verdict}" style="flex-shrink:0;margin-left:12px;">${verdict}</div>
-          </div>
-          <div class="ioc-fields">
-            <div class="ioc-field" style="grid-column:1/-1">
-              <div class="fk">Detection Rate (${malicious}/${total} engines)</div>
-              <div class="detection-bar" style="margin-top:6px;height:12px;">
-                <div class="detection-fill" style="width:${pct}%;background:${malicious>=3?'var(--danger)':malicious>=1?'var(--warning)':'var(--success)'}"></div>
-              </div>
-              <div style="font-size:0.72rem;color:var(--text-3);margin-top:4px;font-family:var(--font-mono);">
-                ${malicious} malicious · ${data.suspicious||0} suspicious · ${data.clean||0} clean
-              </div>
-            </div>
-          </div>
+        <div class="mb-2"><div class="text-[10px] font-mono text-gray-500 mb-1">Detection: ${mal}/${total} engines</div><div class="det-bar"><div class="det-fill" style="width:${pct}%;background:${barColor}"></div></div></div>
+        <div class="grid grid-cols-3 gap-2 text-xs">
+          <div class="bg-white/5 rounded p-2"><div class="text-[10px] font-mono text-gray-500">Type</div><div class="text-gray-200 font-mono">${d.type||'?'}</div></div>
+          <div class="bg-white/5 rounded p-2"><div class="text-[10px] font-mono text-gray-500">Size</div><div class="text-gray-200 font-mono">${d.size_bytes ? Math.round(d.size_bytes/1024)+'KB' : '?'}</div></div>
+          <div class="bg-white/5 rounded p-2"><div class="text-[10px] font-mono text-gray-500">First Seen</div><div class="text-gray-200 font-mono">${d.first_seen ? new Date(d.first_seen*1000).toLocaleDateString() : '?'}</div></div>
         </div>
-      `;
-    } catch (err) {
-      document.getElementById('url-result').innerHTML =
-        `<div class="msg-card err">Request failed: ${err.message}</div>`;
-    } finally {
-      btn.disabled    = false;
-      btn.textContent = 'Scan URL →';
-    }
-  }
+      </div>`;
+  } catch (err) { document.getElementById('hash-result').innerHTML = `<div class="text-tlp-red text-xs font-mono">${err.message}</div>`; }
+  finally { btn.disabled = false; btn.textContent = 'Check â†’'; }
+}
 
-  // ── 12. AI Briefing ──────────────────────────────────────────────────────────
-
-  async function generateBriefing() {
-    const btn    = document.getElementById('briefing-btn');
-    const output = document.getElementById('briefing-output');
-
-    btn.disabled    = true;
-    btn.innerHTML   = '<span>⏳</span> Generating briefing...';
-    output.innerHTML = '<div class="loader"><div class="spinner"></div> Gemini is analyzing today\'s headlines...</div>';
-
-    try {
-      const res  = await fetch('/api/briefing?refresh=true');
-      const data = await res.json();
-
-      if (data.error) {
-        output.innerHTML = `<div class="msg-card warn">⚠ ${data.error}</div>`;
-        return;
-      }
-
-      // Color-code sections by adding spans around keywords
-      let text = data.briefing || '';
-      text = text
-        .replace(/EXECUTIVE SUMMARY/g, '<span style="color:var(--accent);font-weight:600;">EXECUTIVE SUMMARY</span>')
-        .replace(/KEY THREATS/g,       '<span style="color:var(--warning);font-weight:600;">KEY THREATS</span>')
-        .replace(/NOTABLE THREAT ACTORS/g, '<span style="color:var(--purple);font-weight:600;">NOTABLE THREAT ACTORS</span>')
-        .replace(/RECOMMENDED ACTIONS/g,   '<span style="color:var(--success);font-weight:600;">RECOMMENDED ACTIONS</span>')
-        .replace(/THREAT LEVEL:\s*(CRITICAL)/g, 'THREAT LEVEL: <span style="color:var(--danger);font-weight:600;">CRITICAL</span>')
-        .replace(/THREAT LEVEL:\s*(HIGH)/g,     'THREAT LEVEL: <span style="color:var(--warning);font-weight:600;">HIGH</span>')
-        .replace(/THREAT LEVEL:\s*(MODERATE)/g, 'THREAT LEVEL: <span style="color:var(--success);font-weight:600;">MODERATE</span>')
-        .replace(/THREAT LEVEL:\s*(LOW)/g,      'THREAT LEVEL: <span style="color:var(--success);font-weight:600;">LOW</span>');
-
-      const generatedAt = new Date(data.generated_at).toLocaleString();
-
-      output.innerHTML = `
-        <div class="briefing-card">
-          <div class="briefing-text">${text}</div>
-          <div class="briefing-meta">
-            Generated: ${generatedAt} ·
-            Sources analyzed: ${data.sources_used?.join(', ') || 'Multiple'} ·
-            Headlines processed: ${data.headline_count || '—'}
-          </div>
+// â”€â”€ Domain Lookup â”€â”€
+async function lookupDomain() {
+  const input = document.getElementById('domain-input');
+  const btn = document.getElementById('domain-btn');
+  const domain = input.value.trim().replace(/^https?:\/\//i,'').split('/')[0];
+  if (!domain) return;
+  btn.disabled = true; btn.textContent = '...';
+  document.getElementById('domain-result').innerHTML = '<div class="flex items-center gap-2 text-gray-500 text-xs font-mono py-2"><div class="w-3 h-3 border-2 border-white/10 border-t-accent rounded-full animate-spin"></div> Querying VirusTotal...</div>';
+  try {
+    const res = await fetch(`/api/ioc/domain/${encodeURIComponent(domain)}`);
+    const d = await res.json();
+    if (d.error) { document.getElementById('domain-result').innerHTML = `<div class="text-tlp-amber text-xs font-mono p-2">${d.error}</div>`; return; }
+    const verdict = d.verdict || 'UNKNOWN';
+    const mal = d.malicious || 0, total = d.total_engines || 1, pct = Math.round(mal/total*100);
+    const barColor = mal >= 3 ? '#FF4C4C' : mal >= 1 ? '#FFB74D' : '#81C784';
+    const cats = (d.categories || []).join(', ') || 'None';
+    document.getElementById('domain-result').innerHTML = `
+      <div class="bg-white/5 rounded-lg p-3 anim-fade">
+        <div class="flex items-center justify-between mb-3">
+          <div><div class="font-mono text-sm text-gray-100">${domain}</div><div class="text-[10px] text-gray-500">${d.registrar||''}</div></div>
+          <span class="font-mono text-xs font-semibold px-3 py-1 rounded ${verdictClass(verdict)}">${verdict}</span>
         </div>
-      `;
-    } catch (err) {
-      output.innerHTML = `<div class="msg-card err">Error: ${err.message}</div>`;
-    } finally {
-      btn.disabled  = false;
-      btn.innerHTML = '<span>⚡</span> Regenerate Briefing';
-    }
-  }
-
-  // ── 11. OTX Pulses ───────────────────────────────────────────────────────────
-
-  async function loadOTX() {
-    const container = document.getElementById('otx-output');
-    container.innerHTML = '<div class="loader"><div class="spinner"></div> Loading OTX pulses...</div>';
-
-    try {
-      const res  = await fetch('/api/otx/pulses');
-      const data = await res.json();
-
-      if (data.error) {
-        container.innerHTML = `
-          <div class="msg-card warn">
-            ⚠ ${data.error}
-            <br><br>
-            Register for a free OTX account at <strong>otx.alienvault.com</strong>,
-            then copy your API key to the OTX_KEY field in your .env file.
-          </div>`;
-        return;
-      }
-
-      const pulses = data.pulses || [];
-      if (pulses.length === 0) {
-        container.innerHTML = '<div class="msg-card" style="color:var(--text-2);">No pulses found. Try subscribing to more OTX feeds.</div>';
-        return;
-      }
-
-      const cards = pulses.map(p => `
-        <div class="pulse-card" onclick="window.open('https://otx.alienvault.com/pulse/${p.id}', '_blank')" style="cursor:pointer;">
-          <div class="pulse-header">
-            <div class="pulse-name">${p.name}</div>
-            <span class="tlp-badge tlp-${p.tlp}">TLP:${p.tlp?.toUpperCase()}</span>
-          </div>
-          <div class="pulse-desc">${p.description || 'No description provided.'}</div>
-          <div class="pulse-tags">
-            ${(p.tags || []).map(t => `<span class="tag">${t}</span>`).join('')}
-          </div>
-          <div class="pulse-footer">
-            <span>By ${p.author}</span>
-            <span>${p.indicators_count} IOCs</span>
-          </div>
+        <div class="mb-2"><div class="text-[10px] font-mono text-gray-500 mb-1">Detection: ${mal}/${total}</div><div class="det-bar"><div class="det-fill" style="width:${pct}%;background:${barColor}"></div></div></div>
+        <div class="grid grid-cols-2 gap-2 text-xs">
+          <div class="bg-white/5 rounded p-2"><div class="text-[10px] font-mono text-gray-500">Reputation</div><div class="font-mono" style="color:${d.reputation<0?'#FF4C4C':d.reputation>0?'#81C784':'#94a3b8'}">${d.reputation??'N/A'}</div></div>
+          <div class="bg-white/5 rounded p-2"><div class="text-[10px] font-mono text-gray-500">Created</div><div class="text-gray-200 font-mono">${d.creation_date ? new Date(d.creation_date*1000).toLocaleDateString() : '?'}</div></div>
+          <div class="bg-white/5 rounded p-2 col-span-2"><div class="text-[10px] font-mono text-gray-500">Categories</div><div class="text-gray-200 text-[11px]">${cats}</div></div>
         </div>
-      `).join('');
+      </div>`;
+  } catch (err) { document.getElementById('domain-result').innerHTML = `<div class="text-tlp-red text-xs font-mono">${err.message}</div>`; }
+  finally { btn.disabled = false; btn.textContent = 'Check â†’'; }
+}
 
-      container.innerHTML = `<div class="pulses-grid">${cards}</div>`;
+// â”€â”€ URL Scan â”€â”€
+async function scanURL() {
+  const input = document.getElementById('url-input');
+  const btn = document.getElementById('url-btn');
+  const url = input.value.trim();
+  if (!url) return;
+  btn.disabled = true; btn.textContent = '...';
+  document.getElementById('url-result').innerHTML = '<div class="flex items-center gap-2 text-gray-500 text-xs font-mono py-2"><div class="w-3 h-3 border-2 border-white/10 border-t-accent rounded-full animate-spin"></div> Scanning (up to 15s)...</div>';
+  try {
+    const res = await fetch(`/api/ioc/url?url=${encodeURIComponent(url)}`);
+    const d = await res.json();
+    if (d.error) { document.getElementById('url-result').innerHTML = `<div class="text-tlp-amber text-xs font-mono p-2">${d.error}</div>`; return; }
+    if (d.verdict === 'PENDING') { document.getElementById('url-result').innerHTML = `<div class="text-tlp-amber text-xs font-mono p-2">Analysis still queued. Try again shortly.</div>`; return; }
+    const verdict = d.verdict || 'UNKNOWN';
+    const mal = d.malicious || 0, total = d.total_engines || 1, pct = Math.round(mal/total*100);
+    const barColor = mal >= 3 ? '#FF4C4C' : mal >= 1 ? '#FFB74D' : '#81C784';
+    document.getElementById('url-result').innerHTML = `
+      <div class="bg-white/5 rounded-lg p-3 anim-fade">
+        <div class="flex items-center justify-between mb-3">
+          <div class="font-mono text-[11px] text-gray-400 break-all flex-1">${url}</div>
+          <span class="font-mono text-xs font-semibold px-3 py-1 rounded ml-2 flex-shrink-0 ${verdictClass(verdict)}">${verdict}</span>
+        </div>
+        <div><div class="text-[10px] font-mono text-gray-500 mb-1">Detection: ${mal}/${total}</div><div class="det-bar"><div class="det-fill" style="width:${pct}%;background:${barColor}"></div></div>
+        <div class="text-[10px] text-gray-500 font-mono mt-1">${mal} malicious Â· ${d.suspicious||0} suspicious Â· ${d.clean||0} clean</div></div>
+      </div>`;
+  } catch (err) { document.getElementById('url-result').innerHTML = `<div class="text-tlp-red text-xs font-mono">${err.message}</div>`; }
+  finally { btn.disabled = false; btn.textContent = 'Scan â†’'; }
+}
 
-    } catch (err) {
-      container.innerHTML = `<div class="msg-card err">Error: ${err.message}</div>`;
+// â”€â”€ Bulk IOC Scraper â”€â”€
+async function bulkScrape() {
+  const text = document.getElementById('bulk-input').value;
+  const btn = document.getElementById('bulk-btn');
+  const container = document.getElementById('bulk-result');
+  if (!text.trim()) return;
+  const ipRegex = /\b(?:\d{1,3}\.){3}\d{1,3}\b/g;
+  const hashRegex = /\b[a-fA-F0-9]{32,64}\b/g;
+  const ips = [...new Set(text.match(ipRegex) || [])];
+  const hashes = [...new Set(text.match(hashRegex) || [])];
+  if (!ips.length && !hashes.length) { container.innerHTML = '<div class="text-tlp-amber text-xs font-mono">No IPs or hashes found in text.</div>'; return; }
+  btn.disabled = true;
+  container.innerHTML = `<div class="text-xs font-mono text-gray-400">Found ${ips.length} IPs and ${hashes.length} hashes. Looking up...</div>`;
+  let results = '';
+  const ipResults = await Promise.allSettled(ips.slice(0,10).map(ip => fetch(`/api/ioc/ip/${ip}`).then(r=>r.json()).then(d=>({ip,data:d}))));
+  const hashResults = await Promise.allSettled(hashes.slice(0,5).map(h => fetch(`/api/ioc/hash/${h}`).then(r=>r.json()).then(d=>({hash:h,data:d}))));
+  results += '<div class="space-y-1.5 mt-2">';
+  ipResults.forEach(r => {
+    if (r.status === 'fulfilled' && !r.value.data.error) {
+      const d = r.value.data, ip = r.value.ip;
+      const score = d.abuseConfidenceScore || 0;
+      const verdict = score >= 75 ? 'MALICIOUS' : score >= 25 ? 'SUSPICIOUS' : 'CLEAN';
+      results += `<div class="flex items-center justify-between bg-white/5 rounded p-2 text-xs"><span class="font-mono text-gray-300">${ip}</span><span class="font-mono px-2 py-0.5 rounded ${verdictClass(verdict)}">${verdict} (${score}%)</span></div>`;
     }
+  });
+  hashResults.forEach(r => {
+    if (r.status === 'fulfilled' && !r.value.data.error) {
+      const d = r.value.data, h = r.value.hash;
+      const verdict = d.verdict || 'UNKNOWN';
+      results += `<div class="flex items-center justify-between bg-white/5 rounded p-2 text-xs"><span class="font-mono text-gray-300 truncate max-w-[200px]">${h}</span><span class="font-mono px-2 py-0.5 rounded ${verdictClass(verdict)}">${verdict} (${d.malicious||0}/${d.total_engines||0})</span></div>`;
+    }
+  });
+  results += '</div>';
+  container.innerHTML = results;
+  btn.disabled = false;
+}
+
+// â”€â”€ AI Briefing â”€â”€
+async function generateBriefing() {
+  const btn = document.getElementById('briefing-btn');
+  const output = document.getElementById('briefing-output');
+  btn.disabled = true;
+  btn.innerHTML = '<i data-lucide="loader" class="w-3 h-3 animate-spin"></i> Generating...';
+  output.innerHTML = '<div class="flex items-center gap-2 text-gray-500 text-xs font-mono"><div class="w-3 h-3 border-2 border-white/10 border-t-purple-400 rounded-full animate-spin"></div> Gemini is analyzing headlines...</div>';
+  try {
+    const res = await fetch('/api/briefing?refresh=true');
+    const data = await res.json();
+    if (data.error) { output.innerHTML = `<div class="text-tlp-amber text-xs font-mono">${data.error}</div>`; return; }
+    briefingText = data.briefing || '';
+    let text = briefingText
+      .replace(/EXECUTIVE SUMMARY/g, '<span class="text-accent font-semibold">EXECUTIVE SUMMARY</span>')
+      .replace(/KEY THREATS/g, '<span class="text-tlp-amber font-semibold">KEY THREATS</span>')
+      .replace(/NOTABLE THREAT ACTORS/g, '<span class="text-purple-400 font-semibold">NOTABLE THREAT ACTORS</span>')
+      .replace(/RECOMMENDED ACTIONS/g, '<span class="text-tlp-green font-semibold">RECOMMENDED ACTIONS</span>')
+      .replace(/THREAT LEVEL:\s*(CRITICAL)/g, 'THREAT LEVEL: <span class="text-tlp-red font-bold">CRITICAL</span>')
+      .replace(/THREAT LEVEL:\s*(HIGH)/g, 'THREAT LEVEL: <span class="text-tlp-amber font-bold">HIGH</span>')
+      .replace(/THREAT LEVEL:\s*(MODERATE)/g, 'THREAT LEVEL: <span class="text-tlp-green font-bold">MODERATE</span>')
+      .replace(/THREAT LEVEL:\s*(LOW)/g, 'THREAT LEVEL: <span class="text-tlp-green font-bold">LOW</span>');
+    // Extract threat level for KPI
+    const levelMatch = briefingText.match(/THREAT LEVEL:\s*(CRITICAL|HIGH|MODERATE|LOW)/);
+    if (levelMatch) {
+      const lvl = levelMatch[1];
+      const lvlColor = {CRITICAL:'text-tlp-red',HIGH:'text-tlp-amber',MODERATE:'text-tlp-amber',LOW:'text-tlp-green'}[lvl];
+      document.getElementById('kpi-threat').innerHTML = `<span class="${lvlColor}">${lvl}</span>`;
+    }
+    output.innerHTML = `<div class="font-mono text-xs text-gray-200 leading-relaxed whitespace-pre-wrap anim-fade">${text}</div>
+      <div class="text-[10px] text-gray-600 font-mono mt-3 pt-2 border-t border-white/5">Generated: ${new Date(data.generated_at).toLocaleString()} Â· ${data.headline_count||0} headlines Â· ${(data.sources_used||[]).join(', ')}</div>`;
+  } catch (err) { output.innerHTML = `<div class="text-tlp-red text-xs font-mono">${err.message}</div>`; }
+  finally { btn.disabled = false; btn.innerHTML = '<i data-lucide="zap" class="w-3 h-3"></i> Regenerate'; lucide.createIcons(); }
+}
+
+// â”€â”€ AI Chat â”€â”€
+async function askAI() {
+  const input = document.getElementById('ai-chat-input');
+  const question = input.value.trim();
+  if (!question) return;
+  input.value = '';
+  const output = document.getElementById('briefing-output');
+  output.innerHTML += `<div class="mt-3 pt-2 border-t border-white/5"><div class="text-[10px] font-mono text-accent mb-1">YOU</div><div class="text-xs text-gray-300">${question}</div></div>`;
+  output.innerHTML += '<div class="mt-2"><div class="flex items-center gap-2 text-gray-500 text-[10px] font-mono"><div class="w-3 h-3 border-2 border-white/10 border-t-purple-400 rounded-full animate-spin"></div> Thinking...</div></div>';
+  output.scrollTop = output.scrollHeight;
+  try {
+    const res = await fetch(`/api/briefing?refresh=true`);
+    const data = await res.json();
+    const lastDiv = output.lastElementChild;
+    if (lastDiv) lastDiv.innerHTML = `<div class="text-[10px] font-mono text-purple-400 mb-1">AI ANALYST</div><div class="text-xs text-gray-200 leading-relaxed">${(data.briefing||'No response.').replace(/\n/g,'<br>')}</div>`;
+    output.scrollTop = output.scrollHeight;
+  } catch (err) {
+    const lastDiv = output.lastElementChild;
+    if (lastDiv) lastDiv.innerHTML = `<div class="text-tlp-red text-xs font-mono">${err.message}</div>`;
   }
+}
 
+// â”€â”€ API Status â”€â”€
+async function checkStatus() {
+  try {
+    const res = await fetch('/api/status');
+    const d = await res.json();
+    const map = {'dot-gemini':d.gemini,'dot-abuse':d.abuseipdb,'dot-vt':d.virustotal,'dot-otx':d.otx,'dot-tf':d.tweetfeed};
+    for (const [id,ok] of Object.entries(map)) {
+      const el = document.getElementById(id);
+      if (el) { el.className = `w-2 h-2 rounded-full ${ok ? 'bg-tlp-green' : 'bg-tlp-red'}`; }
+    }
+  } catch {}
+}
 
-
-  // ── 13. API Status Check ─────────────────────────────────────────────────────
-
-  async function checkStatus() {
-    try {
-      const res  = await fetch('/api/status');
-      const data = await res.json();
-
-      const map = {
-        'dot-gemini': data.gemini,
-        'dot-abuse':  data.abuseipdb,
-        'dot-vt':     data.virustotal,
-        'dot-otx':    data.otx,
-      };
-
-      for (const [id, ok] of Object.entries(map)) {
-        const el = document.getElementById(id);
-        if (el) el.className = 'dot' + (ok ? ' ok' : '');
-      }
-
-      if (data.rss_feeds) {
-        document.getElementById('feed-count').textContent = data.rss_feeds;
-      }
-    } catch (e) { /* status check failed — non-critical */ }
-  }
-
-  // ── 13. Init ─────────────────────────────────────────────────────────────────
-  // This runs as soon as the page loads (no DOMContentLoaded wrapper needed
-  // because this script tag is at the bottom of the body).
-
-  checkStatus();    // Show which API keys are configured
-  loadDashboard();  // Load stats + latest articles
-
-
+// â”€â”€ Init â”€â”€
+checkStatus();
+loadDashboard();
+lucide.createIcons();
 </script>
 </body>
 </html>
